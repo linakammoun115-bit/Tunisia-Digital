@@ -58,15 +58,17 @@ function Admin() {
 
 
 
-  const [cards,setCards] = useState(
+ const [cards, setCards] = useState(() => {
 
-    JSON.parse(
-      localStorage.getItem("floatingCards")
-      ||
-      JSON.stringify(defaultCards)
-    )
+  const saved = localStorage.getItem("floatingCards");
 
-  );
+  if (saved) {
+    return JSON.parse(saved);
+  }
+
+  return defaultCards;
+
+});
 
 
 
