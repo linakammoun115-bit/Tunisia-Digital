@@ -14,7 +14,7 @@ function AdminLogin() {
 
   const login = () => {
     if (
-      username === "linakammoun115@gmail.com" &&
+      username === "youssefrebai03@gmail.com" &&
       password === "123456"
     ) {
       localStorage.setItem("adminAuth", "true");
