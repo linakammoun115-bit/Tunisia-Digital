@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
-import { Menu, X, Sparkles, ShoppingCart, CircleUserRound } from "lucide-react";
-import { Button } from "../ui/button";
+import {
+  Menu,
+  X,
+  Sparkles,
+  ShoppingCart,
+  CircleUserRound,
+} from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 const links = [
@@ -53,64 +58,118 @@ export function Navbar() {
   return (
     <header
       className={`fixed inset-x-0 top-0 z-50 ${
-        scrolled ? "glass border-b border-border/50" : "bg-transparent"
+        scrolled
+          ? "glass border-b border-border/50"
+          : "bg-transparent"
       }`}
     >
       <nav className="container mx-auto flex h-16 items-center justify-between px-6">
-        
-        {/* LOGO */}
+        {/* Logo */}
         <a href="#top" className="flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-primary" />
-          <span className="font-bold">
-            Tunisia<span className="gradient-text">Subs</span>
+          <span className="font-bold text-lg">
+            Tunisia<span className="text-primary">Subs</span>
           </span>
         </a>
 
-        {/* LINKS */}
+        {/* Desktop Navigation */}
         <div className="hidden lg:flex items-center gap-8">
-          {links.map((l) => (
-            <a key={l.href} href={l.href}>
-              {l.label}
-            </a>
-          ))}
+          {links.map((link) =>
+            link.href.startsWith("/") ? (
+              <Link
+                key={link.href}
+                to={link.href}
+                className="hover:text-primary transition-colors"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.href}
+                href={link.href}
+                className="hover:text-primary transition-colors"
+              >
+                {link.label}
+              </a>
+            )
+          )}
         </div>
 
-        {/* RIGHT */}
-        <div className="flex items-center gap-3">
-          
-          {/* CART */}
-          <Link to="/cart" className="relative">
-            <ShoppingCart />
+        {/* Right Section */}
+        <div className="flex items-center gap-4">
+          {/* Cart */}
+          <Link
+            to="/cart"
+            className="relative hover:text-primary transition-colors"
+          >
+            <ShoppingCart className="w-6 h-6" />
             {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 text-xs bg-primary text-white rounded-full px-1">
+              <span className="absolute -top-2 -right-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1 text-xs text-white">
                 {cartCount}
               </span>
             )}
           </Link>
 
-          {/* ACCOUNT */}
-          <Link to="/account">
-            <CircleUserRound />
+          {/* Account */}
+          <Link
+            to="/account"
+            className="hover:text-primary transition-colors"
+          >
+            <CircleUserRound className="w-6 h-6" />
           </Link>
 
-          {/* MENU MOBILE */}
-          <button onClick={() => setOpen(!open)}>
-            {open ? <X /> : <Menu />}
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setOpen(!open)}
+            className="lg:hidden"
+          >
+            {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
       </nav>
 
-      {/* MOBILE MENU */}
+      {/* Mobile Menu */}
       {open && (
-        <div className="lg:hidden">
-          {links.map((l) => (
-            <a key={l.href} href={l.href}>
-              {l.label}
-            </a>
-          ))}
+        <div className="lg:hidden border-t border-border bg-background px-6 py-4">
+          <div className="flex flex-col gap-4">
+            {links.map((link) =>
+              link.href.startsWith("/") ? (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  onClick={() => setOpen(false)}
+                  className="hover:text-primary"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className="hover:text-primary"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
 
-          <Link to="/account">Mon compte</Link>
-          <Link to="/cart">Panier ({cartCount})</Link>
+            <Link
+              to="/account"
+              onClick={() => setOpen(false)}
+              className="hover:text-primary"
+            >
+              Mon compte
+            </Link>
+
+            <Link
+              to="/cart"
+              onClick={() => setOpen(false)}
+              className="hover:text-primary"
+            >
+              Panier ({cartCount})
+            </Link>
+          </div>
         </div>
       )}
     </header>
