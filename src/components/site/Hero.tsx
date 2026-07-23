@@ -1,7 +1,50 @@
 import { ArrowRight, Sparkles, ShieldCheck, Zap, Star } from "lucide-react";
 import { Button } from "../ui/button";
+import { useEffect, useState } from "react";
 
 export function Hero() {
+  export function Hero() {
+
+const defaultCards = [
+  {
+    id:1,
+    name:"Canva Pro",
+    category:"Design",
+    price:"10 DT",
+    oldPrice:"20 DT"
+  },
+
+  {
+    id:2,
+    name:"Adobe Creative Cloud Pro",
+    category:"Creative",
+    price:"40 DT"
+  },
+
+  {
+    id:3,
+    name:"Microsoft Office Professional Plus",
+    category:"Productivity",
+    price:"80 DT"
+  }
+];
+
+
+const [cards,setCards] = useState(defaultCards);
+
+
+useEffect(()=>{
+
+const saved =
+localStorage.getItem("floatingCards");
+
+
+if(saved){
+setCards(JSON.parse(saved));
+}
+
+
+},[]);
   return (
     <section id="top" className="relative pt-32 pb-24 overflow-hidden gradient-hero">
       
@@ -95,12 +138,17 @@ export function Hero() {
                   <Sparkles className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold">Canva Pro</div>
-                  <div className="text-xs text-muted-foreground">1 year</div>
-                </div>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold gradient-text">10 DT</span>
+                 <div className="text-sm font-semibold">
+{cards[0].name}
+</div>
+
+<div className="text-xs text-muted-foreground">
+{cards[0].category}
+</div>
+
+<span className="text-xl font-bold gradient-text">
+{cards[0].price}
+</span>
                 <span className="text-xs line-through text-muted-foreground">20 DT</span>
               </div>
             </div>
@@ -113,9 +161,9 @@ export function Hero() {
                 </div>
                 <Star className="h-4 w-4 text-warning fill-warning" />
               </div>
-              <div className="text-sm font-semibold mb-1">Adobe Creative Cloud Pro</div>
-              <div className="text-xs text-muted-foreground mb-2">Creative</div>
-              <div className="text-xl font-bold gradient-text">40 DT</div>
+              <div className="text-sm font-semibold mb-1">{cards[1].name}</div>
+              <div className="text-xs text-muted-foreground mb-2">{cards[1].category}</div>
+              <div className="text-xl font-bold gradient-text">{cards[1].price}</div>
             </div>
 
             {/* CARD 3 */}
@@ -125,12 +173,12 @@ export function Hero() {
                   <ShieldCheck className="h-5 w-5 text-success" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold">Microsoft Office Professional Plus</div>
-                  <div className="text-xs text-muted-foreground">Microsoft Office Professional Plus</div>
+                  <div className="text-sm font-semibold">{cards[2].name}</div>
+                  <div className="text-xs text-muted-foreground">{cards[2].category}</div>
                 </div>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold gradient-text">80 DT</span>
+                <span className="text-xl font-bold gradient-text">{cards[2].price}</span>
                 <span className="text-xs text-success">-43% off</span>
               </div>
             </div>
