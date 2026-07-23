@@ -33,15 +33,36 @@ const defaultCards = [
 const [cards,setCards] = useState(defaultCards);
 
 
-useEffect(()=>{
+useEffect(() => {
 
-const saved =
-localStorage.getItem("floatingCards");
+  const loadCards = () => {
+
+    const saved = localStorage.getItem("floatingCards");
+
+    if(saved){
+      setCards(JSON.parse(saved));
+    }
+
+  };
 
 
-if(saved){
-setCards(JSON.parse(saved));
-}
+  loadCards();
+
+
+  window.addEventListener(
+    "storage",
+    loadCards
+  );
+
+
+  return () => {
+
+    window.removeEventListener(
+      "storage",
+      loadCards
+    );
+
+  };
 
 
 },[]);
