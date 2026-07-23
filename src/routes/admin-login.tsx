@@ -112,18 +112,24 @@ function Admin() {
   const saveCards = ()=>{
 
 
-    localStorage.setItem(
-      "floatingCards",
-      JSON.stringify(cards)
-    );
+localStorage.setItem(
+"floatingCards",
+JSON.stringify(cards)
+);
 
 
-    alert(
-      "Les cartes Hero ont été mises à jour ✅"
-    );
+// Force la mise à jour dans la même page
+window.dispatchEvent(
+new Event("storage")
+);
 
 
-  };
+alert(
+"Floating Cards mises à jour ✅"
+);
+
+
+};
 
 
 
