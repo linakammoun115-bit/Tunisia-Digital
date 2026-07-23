@@ -8,408 +8,467 @@ export const Route = createFileRoute("/admin")({
 });
 
 
-type Card = {
-  id: number;
-  name: string;
-  category: string;
-  price: string;
-  oldPrice: string;
+type Product = {
+  id:number;
+  name:string;
+  price:string;
+  active:boolean;
+};
+
+
+type FloatingCard = {
+  id:number;
+  name:string;
+  category:string;
+  price:string;
+  oldPrice:string;
+  active:boolean;
 };
 
 
 
-function Admin() {
 
-  const navigate = useNavigate();
+function Admin(){
 
 
-  // Vérification connexion admin
+const navigate = useNavigate();
 
-  useEffect(() => {
 
-    const isAdmin = localStorage.getItem("adminAuth");
 
-    if (!isAdmin) {
+useEffect(()=>{
 
-      navigate({
-        to: "/admin-login",
-      });
+const auth = localStorage.getItem("adminAuth");
 
-    }
+if(!auth){
 
-  }, [navigate]);
+navigate({
+to:"/admin-login"
+});
 
+}
 
+},[navigate]);
 
 
 
-  const defaultCards: Card[] = [
 
-    {
-      id: 1,
-      name: "Canva Pro",
-      category: "Design",
-      price: "10 DT",
-      oldPrice: "20 DT",
-    },
 
+// =====================
+// PRODUITS
+// =====================
 
-    {
-      id: 2,
-      name: "Adobe Creative Cloud Pro",
-      category: "Creative",
-      price: "40 DT",
-      oldPrice: "",
-    },
 
+const [products,setProducts]=useState<Product[]>(()=>{
 
-    {
-      id: 3,
-      name: "Microsoft Office Professional Plus",
-      category: "Productivity",
-      price: "80 DT",
-      oldPrice: "140 DT",
-    },
 
-  ];
+const saved = localStorage.getItem("products");
 
 
+return saved 
+? JSON.parse(saved)
+:
+[
+{
+id:1,
+name:"Canva Pro",
+price:"10 DT",
+active:true
+},
+{
+id:2,
+name:"Adobe Pro",
+price:"40 DT",
+active:true
+}
+];
 
 
+});
 
-  const [cards, setCards] = useState<Card[]>(() => {
 
 
-    const saved = localStorage.getItem(
-      "floatingCards"
-    );
 
 
-    if(saved){
 
-      return JSON.parse(saved);
 
-    }
+// =====================
+// FLOATING CARDS
+// =====================
 
 
-    return defaultCards;
+const [cards,setCards]=useState<FloatingCard[]>(()=>{
 
 
-  });
+const saved =
+localStorage.getItem("floatingCards");
 
 
+return saved
+?
+JSON.parse(saved)
+:
+[
+{
+id:1,
+name:"Canva Pro",
+category:"Design",
+price:"10 DT",
+oldPrice:"20 DT",
+active:true
+},
+{
+id:2,
+name:"Adobe Creative Cloud",
+category:"Creative",
+price:"40 DT",
+oldPrice:"",
+active:true
+},
+{
+id:3,
+name:"Microsoft Office",
+category:"Productivity",
+price:"80 DT",
+oldPrice:"140 DT",
+active:true
+}
+];
 
 
+});
 
 
 
-  // Modifier une carte
 
-  const updateCard = (
-    id:number,
-    field:keyof Card,
-    value:string
-  )=>{
 
 
-    const updatedCards = cards.map((card)=>{
 
+// =====================
+// CLIENTS / COMMANDES
+// =====================
 
-      if(card.id === id){
 
+const [clients] = useState([
+{
+id:1,
+name:"Client test",
+status:"Actif"
+}
+]);
 
-        return {
 
-          ...card,
 
-          [field]: value,
+const [orders] = useState([
+{
+id:1,
+product:"Canva Pro",
+status:"En attente"
+}
+]);
 
-        };
 
 
-      }
 
 
-      return card;
 
 
-    });
+// =====================
+// SAUVEGARDE
+// =====================
 
 
+const saveCards = ()=>{
 
-    setCards(updatedCards);
 
+localStorage.setItem(
+"floatingCards",
+JSON.stringify(cards)
+);
 
-  };
 
+window.dispatchEvent(
+new Event("floatingCardsUpdated")
+);
 
 
 
+alert(
+"Floating Cards sauvegardées ✅"
+);
 
 
+};
 
 
 
-  // Sauvegarde
 
-  const saveCards = ()=>{
 
 
-    localStorage.setItem(
-      "floatingCards",
-      JSON.stringify(cards)
-    );
+const saveProducts = ()=>{
 
 
+localStorage.setItem(
+"products",
+JSON.stringify(products)
+);
 
-    // informe Hero/FloatingCard
 
-    window.dispatchEvent(
-      new Event("floatingCardsUpdated")
-    );
+alert(
+"Produits sauvegardés ✅"
+);
 
 
+};
 
-    alert(
-      "Floating Cards mises à jour ✅"
-    );
 
 
-  };
 
 
 
 
+const updateCard=(id:number,field:keyof FloatingCard,value:any)=>{
 
 
+setCards(
+cards.map(card=>
 
+card.id===id
+?
+{
+...card,
+[field]:value
+}
+:
+card
 
+)
+);
 
-  // Logout
 
-  const logout = ()=>{
+};
 
 
-    localStorage.removeItem(
-      "adminAuth"
-    );
 
 
-    navigate({
-      to:"/admin-login",
-    });
 
 
-  };
+const logout=()=>{
 
 
+localStorage.removeItem(
+"adminAuth"
+);
 
 
+navigate({
+to:"/admin-login"
+});
 
 
+};
 
 
 
-  return (
 
-    <div
-      className="
-      min-h-screen
-      bg-background
-      p-6
-      "
-    >
 
 
 
-      {/* HEADER */}
+return (
 
-      <div
-        className="
-        flex
-        justify-between
-        items-center
-        mb-10
-        "
-      >
 
+<div className="
+min-h-screen
+bg-background
+p-6
+">
 
-        <h1
-          className="
-          text-3xl
-          font-bold
-          "
-        >
 
-          TunisiaSubs Admin
 
-        </h1>
 
 
+<div className="
+flex
+justify-between
+items-center
+mb-10
+">
 
 
-        <Button
-          variant="destructive"
-          onClick={logout}
-        >
+<h1 className="
+text-3xl
+font-bold
+">
 
-          Déconnexion
+Admin Dashboard
 
-        </Button>
+</h1>
 
 
 
-      </div>
+<Button
+variant="destructive"
+onClick={logout}
+>
 
+Déconnexion
 
+</Button>
 
 
+</div>
 
 
 
 
 
-      {/* FLOATING CARDS */}
 
+{/* STATS */}
 
-      <div
-        className="
-        max-w-3xl
-        rounded-3xl
-        border
-        p-6
-        "
-      >
 
+<div className="
+grid
+md:grid-cols-3
+gap-5
+mb-10
+">
 
 
-        <h2
-          className="
-          text-2xl
-          font-bold
-          mb-6
-          "
-        >
+<div className="border rounded-2xl p-5">
+<h3>Produits</h3>
+<p className="text-3xl font-bold">
+{products.length}
+</p>
+</div>
 
-          Gestion Floating Cards Hero
 
-        </h2>
 
+<div className="border rounded-2xl p-5">
+<h3>Clients</h3>
+<p className="text-3xl font-bold">
+{clients.length}
+</p>
+</div>
 
 
 
+<div className="border rounded-2xl p-5">
+<h3>Commandes</h3>
+<p className="text-3xl font-bold">
+{orders.length}
+</p>
+</div>
 
 
+</div>
 
-        {
-          cards.map((card)=>(
 
 
-            <div
-              key={card.id}
 
-              className="
-              mb-6
-              rounded-2xl
-              border
-              p-5
-              space-y-4
-              "
-            >
 
 
 
 
-              <h3
-                className="
-                font-bold
-                text-lg
-                "
-              >
 
-                Carte {card.id}
+{/* PRODUITS */}
 
-              </h3>
 
+<div className="
+border
+rounded-3xl
+p-6
+mb-10
+">
 
 
+<h2 className="
+text-2xl
+font-bold
+mb-5
+">
 
+Gestion Produits
 
+</h2>
 
 
 
+{
+products.map(product=>(
 
-              <div>
 
+<div
+key={product.id}
+className="
+border
+rounded-xl
+p-4
+mb-3
+flex
+justify-between
+"
+>
 
-                <label>
-                  Nom produit
-                </label>
 
+<div>
 
-                <input
+<b>{product.name}</b>
 
-                  className="
-                  w-full
-                  rounded-xl
-                  border
-                  p-3
-                  "
+<p>
+{product.price}
+</p>
 
-                  value={card.name}
+</div>
 
-                  onChange={(e)=>
-                    updateCard(
-                      card.id,
-                      "name",
-                      e.target.value
-                    )
-                  }
 
-                />
 
+<input
+type="checkbox"
+checked={product.active}
+onChange={()=>{
 
-              </div>
 
+setProducts(
+products.map(p=>
 
+p.id===product.id
+?
+{
+...p,
+active:!p.active
+}
+:
+p
 
+)
+)
 
 
+}}
+/>
 
 
 
+</div>
 
-              <div>
 
+))
+}
 
-                <label>
-                  Catégorie
-                </label>
 
 
-                <input
 
-                  className="
-                  w-full
-                  rounded-xl
-                  border
-                  p-3
-                  "
+<Button
+onClick={saveProducts}
+className="w-full"
+>
 
-                  value={card.category}
+Sauvegarder produits
 
-                  onChange={(e)=>
-                    updateCard(
-                      card.id,
-                      "category",
-                      e.target.value
-                    )
-                  }
+</Button>
 
-                />
 
 
-              </div>
+</div>
 
 
 
@@ -419,123 +478,156 @@ function Admin() {
 
 
 
-              <div>
+{/* FLOATING CARDS */}
 
 
-                <label>
-                  Prix
-                </label>
 
+<div className="
+border
+rounded-3xl
+p-6
+">
 
-                <input
 
-                  className="
-                  w-full
-                  rounded-xl
-                  border
-                  p-3
-                  "
+<h2 className="
+text-2xl
+font-bold
+mb-5
+">
 
-                  value={card.price}
+Gestion Floating Cards Hero
 
-                  onChange={(e)=>
-                    updateCard(
-                      card.id,
-                      "price",
-                      e.target.value
-                    )
-                  }
+</h2>
 
-                />
 
 
-              </div>
+{
 
+cards.map(card=>(
 
 
+<div
+key={card.id}
+className="
+border
+rounded-2xl
+p-5
+mb-5
+space-y-3
+"
+>
 
 
+<input
+className="border p-3 rounded-xl w-full"
+value={card.name}
+onChange={(e)=>
+updateCard(
+card.id,
+"name",
+e.target.value
+)
+}
+/>
 
 
 
+<input
+className="border p-3 rounded-xl w-full"
+value={card.category}
+onChange={(e)=>
+updateCard(
+card.id,
+"category",
+e.target.value
+)
+}
+/>
 
-              <div>
 
 
-                <label>
-                  Ancien prix
-                </label>
+<input
+className="border p-3 rounded-xl w-full"
+value={card.price}
+onChange={(e)=>
+updateCard(
+card.id,
+"price",
+e.target.value
+)
+}
+/>
 
 
-                <input
 
-                  className="
-                  w-full
-                  rounded-xl
-                  border
-                  p-3
-                  "
+<input
+className="border p-3 rounded-xl w-full"
+value={card.oldPrice}
+onChange={(e)=>
+updateCard(
+card.id,
+"oldPrice",
+e.target.value
+)
+}
+/>
 
-                  value={card.oldPrice}
 
-                  onChange={(e)=>
-                    updateCard(
-                      card.id,
-                      "oldPrice",
-                      e.target.value
-                    )
-                  }
 
-                />
+<label>
 
+<input
+type="checkbox"
+checked={card.active}
+onChange={()=>
+updateCard(
+card.id,
+"active",
+!card.active
+)
+}
+/>
 
-              </div>
+ Active
 
+</label>
 
 
 
+</div>
 
-            </div>
 
+))
 
-          ))
-        }
+}
 
 
 
 
+<Button
+onClick={saveCards}
+className="w-full"
+>
 
+Sauvegarder Floating Cards
 
+</Button>
 
 
 
-        <Button
 
-          onClick={saveCards}
+</div>
 
-          className="
-          w-full
-          "
 
-        >
 
-          Sauvegarder les modifications
 
-        </Button>
 
 
 
+</div>
 
 
-      </div>
-
-
-
-
-    </div>
-
-
-  );
+);
 
 
 }
