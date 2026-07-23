@@ -59,6 +59,7 @@ function Admin() {
 
 
  const [cards, setCards] = useState(() => {
+   console.log(cards);
 
   const saved = localStorage.getItem("floatingCards");
 
