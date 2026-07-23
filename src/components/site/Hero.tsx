@@ -1,9 +1,9 @@
+import { useEffect, useState } from "react";
 import { ArrowRight, Sparkles, ShieldCheck, Zap, Star } from "lucide-react";
 import { Button } from "../ui/button";
-import { useEffect, useState } from "react";
+
 
 export function Hero() {
-  export function Hero() {
 
 const defaultCards = [
   {
