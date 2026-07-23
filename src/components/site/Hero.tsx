@@ -132,27 +132,54 @@ setCards(JSON.parse(saved));
             <div className="absolute inset-0 gradient-primary rounded-full blur-3xl opacity-30 animate-pulse-glow" />
 
             {/* CARD 1 */}
-            <div className="absolute top-10 left-0 glass rounded-2xl p-4 w-52 animate-float shadow-elegant">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-primary-foreground" />
-                </div>
-                <div>
-                 <div className="text-sm font-semibold">
-{cards[0].name}
+            {/* CARD 1 */}
+<div className="absolute top-10 left-0 glass rounded-2xl p-4 w-52 animate-float shadow-elegant">
+
+  <div className="flex items-center gap-3 mb-2">
+
+    <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center">
+      <Sparkles className="h-5 w-5 text-primary-foreground" />
+    </div>
+
+
+    <div>
+
+      <div className="text-sm font-semibold">
+        {cards[0].name}
+      </div>
+
+
+      <div className="text-xs text-muted-foreground">
+        {cards[0].category}
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+
+  <div className="flex items-baseline gap-2">
+
+    <span className="text-xl font-bold gradient-text">
+      {cards[0].price}
+    </span>
+
+
+    {
+      cards[0].oldPrice && (
+        <span className="text-xs line-through text-muted-foreground">
+          {cards[0].oldPrice}
+        </span>
+      )
+    }
+
+
+  </div>
+
+
 </div>
-
-<div className="text-xs text-muted-foreground">
-{cards[0].category}
-</div>
-
-<span className="text-xl font-bold gradient-text">
-{cards[0].price}
-</span>
-                <span className="text-xs line-through text-muted-foreground">20 DT</span>
-              </div>
-            </div>
-
             {/* CARD 2 */}
             <div className="absolute top-32 right-0 glass rounded-2xl p-4 w-56 animate-float [animation-delay:1.5s] shadow-elegant">
               <div className="flex items-center justify-between mb-2">
