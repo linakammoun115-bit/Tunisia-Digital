@@ -2,58 +2,452 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
-export const Route = createFileRoute("/admin-login")({
-  component: AdminLogin,
+
+export const Route = createFileRoute("/admin")({
+  component: Admin,
 });
 
-function AdminLogin() {
+
+function Admin() {
+
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
 
-  const login = () => {
-    if (
-      username === "youssefrebai03@gmail.com" &&
-      password === "123456"
-    ) {
-      localStorage.setItem("adminAuth", "true");
-      navigate({ to: "/admin" });
-    } else {
-      alert("Login ou mot de passe incorrect");
+  // Vérification connexion admin
+
+  const isAdmin = localStorage.getItem("adminAuth");
+
+
+  if (!isAdmin) {
+    navigate({
+      to: "/admin-login"
+    });
+  }
+
+
+
+  const defaultCards = [
+
+    {
+      id:1,
+      name:"Canva Pro",
+      category:"Design",
+      price:"10 DT",
+      oldPrice:"20 DT"
+    },
+
+
+    {
+      id:2,
+      name:"Adobe Creative Cloud Pro",
+      category:"Creative",
+      price:"40 DT",
+      oldPrice:""
+    },
+
+
+    {
+      id:3,
+      name:"Microsoft Office Professional Plus",
+      category:"Productivity",
+      price:"80 DT",
+      oldPrice:"140 DT"
     }
+
+  ];
+
+
+
+  const [cards,setCards] = useState(
+
+    JSON.parse(
+      localStorage.getItem("floatingCards")
+      ||
+      JSON.stringify(defaultCards)
+    )
+
+  );
+
+
+
+  // Modifier une carte
+
+  const updateCard = (
+    id:number,
+    field:string,
+    value:string
+  ) => {
+
+
+    const updated = cards.map((card:any)=>
+
+
+      card.id === id
+
+      ?
+
+      {
+        ...card,
+        [field]:value
+      }
+
+      :
+
+      card
+
+
+    );
+
+
+    setCards(updated);
+
+
   };
 
+
+
+
+  // Sauvegarder
+
+  const saveCards = ()=>{
+
+
+    localStorage.setItem(
+      "floatingCards",
+      JSON.stringify(cards)
+    );
+
+
+    alert(
+      "Les cartes Hero ont été mises à jour ✅"
+    );
+
+
+  };
+
+
+
+
+  // Déconnexion
+
+  const logout = ()=>{
+
+    localStorage.removeItem("adminAuth");
+
+    navigate({
+      to:"/admin-login"
+    });
+
+  };
+
+
+
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="w-full max-w-md rounded-3xl border p-8">
-        <h1 className="mb-6 text-center text-3xl font-bold">
-          Admin Login
+
+    <div
+      className="
+      min-h-screen
+      bg-background
+      p-6
+      "
+    >
+
+
+
+      {/* HEADER */}
+
+      <div
+        className="
+        flex
+        justify-between
+        items-center
+        mb-10
+        "
+      >
+
+        <h1
+          className="
+          text-3xl
+          font-bold
+          "
+        >
+
+          TunisiaSubs Admin
+
         </h1>
 
-        <input
-          type="text"
-          placeholder="Login"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          className="mb-4 w-full rounded-lg border p-3"
-        />
 
-        <input
-          type="password"
-          placeholder="Mot de passe"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mb-6 w-full rounded-lg border p-3"
-        />
 
         <Button
-          onClick={login}
-          className="w-full"
+          variant="destructive"
+          onClick={logout}
         >
-          Connexion
+
+          Déconnexion
+
         </Button>
+
+
       </div>
+
+
+
+
+
+      {/* HERO CARDS MANAGEMENT */}
+
+
+      <div
+        className="
+        max-w-3xl
+        rounded-3xl
+        border
+        p-6
+        "
+      >
+
+
+        <h2
+          className="
+          text-2xl
+          font-bold
+          mb-6
+          "
+        >
+
+          Gestion Floating Cards Hero
+
+        </h2>
+
+
+
+
+        {
+          cards.map((card:any)=>(
+
+
+            <div
+
+              key={card.id}
+
+              className="
+              mb-6
+              rounded-2xl
+              border
+              p-5
+              space-y-4
+              "
+
+            >
+
+
+              <h3
+                className="
+                font-bold
+                text-lg
+                "
+              >
+
+                Carte {card.id}
+
+              </h3>
+
+
+
+
+              <div>
+
+
+                <label
+                  className="
+                  text-sm
+                  text-muted-foreground
+                  "
+                >
+                  Nom produit
+                </label>
+
+
+                <input
+
+                  className="
+                  w-full
+                  rounded-xl
+                  border
+                  p-3
+                  "
+
+                  value={card.name}
+
+                  onChange={(e)=>
+                    updateCard(
+                      card.id,
+                      "name",
+                      e.target.value
+                    )
+                  }
+
+                />
+
+
+              </div>
+
+
+
+
+
+              <div>
+
+
+                <label
+                  className="
+                  text-sm
+                  text-muted-foreground
+                  "
+                >
+                  Catégorie
+                </label>
+
+
+                <input
+
+                  className="
+                  w-full
+                  rounded-xl
+                  border
+                  p-3
+                  "
+
+                  value={card.category}
+
+                  onChange={(e)=>
+                    updateCard(
+                      card.id,
+                      "category",
+                      e.target.value
+                    )
+                  }
+
+                />
+
+
+              </div>
+
+
+
+
+
+
+              <div>
+
+
+                <label
+                  className="
+                  text-sm
+                  text-muted-foreground
+                  "
+                >
+                  Prix
+                </label>
+
+
+                <input
+
+                  className="
+                  w-full
+                  rounded-xl
+                  border
+                  p-3
+                  "
+
+                  value={card.price}
+
+                  onChange={(e)=>
+                    updateCard(
+                      card.id,
+                      "price",
+                      e.target.value
+                    )
+                  }
+
+                />
+
+
+              </div>
+
+
+
+
+
+
+              <div>
+
+
+                <label
+                  className="
+                  text-sm
+                  text-muted-foreground
+                  "
+                >
+                  Ancien prix
+                </label>
+
+
+                <input
+
+                  className="
+                  w-full
+                  rounded-xl
+                  border
+                  p-3
+                  "
+
+                  value={card.oldPrice}
+
+                  onChange={(e)=>
+                    updateCard(
+                      card.id,
+                      "oldPrice",
+                      e.target.value
+                    )
+                  }
+
+                />
+
+
+              </div>
+
+
+
+            </div>
+
+
+          ))
+        }
+
+
+
+
+        <Button
+          onClick={saveCards}
+          className="
+          w-full
+          "
+        >
+
+          Sauvegarder les modifications
+
+        </Button>
+
+
+
+      </div>
+
+
+
     </div>
+
   );
+
 }
