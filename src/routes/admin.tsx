@@ -260,6 +260,80 @@ const clientMatchesFilters = (client: Client) => {
     <main className="min-h-screen bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-7xl">
         <h1 className="mb-8 text-4xl font-bold">Dashboard Admin</h1>
+        {/* FLOATING ADMIN CARD */}
+<div className="relative mb-10 overflow-hidden rounded-3xl border bg-card p-6 shadow-xl">
+
+  {/* effet flottant */}
+  <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
+  <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-blue-500/20 blur-3xl" />
+
+  <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+
+    <div>
+      <p className="text-sm text-muted-foreground">
+        Bienvenue dans votre espace
+      </p>
+
+      <h2 className="mt-2 text-3xl font-bold">
+        Gestion DADI Admin 🚀
+      </h2>
+
+      <p className="mt-2 text-muted-foreground">
+        Gérez vos produits, clients, commandes et paiements depuis un seul endroit.
+      </p>
+    </div>
+
+
+    <div className="grid grid-cols-2 gap-3">
+
+      <div className="rounded-2xl border bg-background/60 p-4 backdrop-blur">
+        <p className="text-xs text-muted-foreground">
+          Produits actifs
+        </p>
+
+        <p className="text-2xl font-bold text-green-500">
+          {visibleProducts}
+        </p>
+      </div>
+
+
+      <div className="rounded-2xl border bg-background/60 p-4 backdrop-blur">
+        <p className="text-xs text-muted-foreground">
+          Clients
+        </p>
+
+        <p className="text-2xl font-bold">
+          {clients.length}
+        </p>
+      </div>
+
+
+      <div className="rounded-2xl border bg-background/60 p-4 backdrop-blur">
+        <p className="text-xs text-muted-foreground">
+          Panier
+        </p>
+
+        <p className="text-2xl font-bold">
+          {totalCartItems}
+        </p>
+      </div>
+
+
+      <div className="rounded-2xl border bg-background/60 p-4 backdrop-blur">
+        <p className="text-xs text-muted-foreground">
+          Valeur
+        </p>
+
+        <p className="text-2xl font-bold text-primary">
+          {totalCartValue} DT
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
         <a href="/#subscriptions">
   <button className="mb-6 rounded-md bg-primary px-5 py-2 text-primary-foreground">
     Aller aux produits
