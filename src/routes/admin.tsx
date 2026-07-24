@@ -1,7 +1,6 @@
 import { getProducts, saveProducts, Subscription } from "@/lib/products";
 import { getClients, saveClients, Client } from "@/lib/clients";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   getPaymentMethods,
@@ -56,11 +55,11 @@ function AdminPage() {
   };
 
   const addProduct = () => {
-    if (!newName) return alert("Écris le nom du produit");
+    if (!newName) return alert("�cris le nom du produit");
 
     const slug = slugify(newName);
 
-    if (products[slug]) return alert("Ce produit existe déjà");
+    if (products[slug]) return alert("Ce produit existe d�j�");
 const updated: Record<string, Subscription> = {
   ...products,
   [slug]: {
@@ -152,7 +151,7 @@ const updatePaymentMethods = (updated: PaymentMethod[]) => {
 
 const addPaymentMethod = () => {
   if (!newPaymentName || !newPaymentDetails) {
-    alert("Remplis le nom et les détails");
+    alert("Remplis le nom et les d�tails");
     return;
   }
 
@@ -191,7 +190,7 @@ const updateClients = (updated: Client[]) => {
 
 const addClient = () => {
   if (!newClient.name || !newClient.phone) {
-    alert("Nom et téléphone obligatoires");
+    alert("Nom et t�l�phone obligatoires");
     return;
   }
 
@@ -330,7 +329,7 @@ const clientMatchesFilters = (client: Client) => {
     
     <input
       className="rounded-md border px-4 py-2"
-      placeholder="Téléphone"
+      placeholder="T�l�phone"
       value={newClient.phone}
       onChange={(e) =>
         setNewClient({ ...newClient, phone: e.target.value })
@@ -369,7 +368,7 @@ const clientMatchesFilters = (client: Client) => {
     value={durationFilter}
     onChange={(e) => setDurationFilter(e.target.value)}
   >
-    <option className="text-black" value="">Toutes les durées</option>
+    <option className="text-black" value="">Toutes les dur�es</option>
       <option className="text-black" value="1 month">1 Month</option>
 
   <option className="text-black" value="6 months">6 Months</option>
@@ -381,9 +380,9 @@ const clientMatchesFilters = (client: Client) => {
       <thead className="bg-muted">
         <tr>
           <th className="p-4">Nom</th>
-          <th className="p-4">Téléphone</th>
+          <th className="p-4">T�l�phone</th>
           <th className="p-4">Commandes</th>
-          <th className="p-4">État</th>
+          <th className="p-4">�tat</th>
           <th className="p-4">Action</th>
         </tr>
       </thead>
@@ -437,7 +436,7 @@ const clientMatchesFilters = (client: Client) => {
 
                 {order.items?.map((item: any) => (
                   <div key={item.slug}>
-                    {item.name} × {item.quantity}
+                    {item.name} � {item.quantity}
                   </div>
                 ))}
               </div>
@@ -476,19 +475,19 @@ const clientMatchesFilters = (client: Client) => {
   </div>
 </div>
 <div className="mb-8 rounded-2xl border bg-card p-6">
-  <h2 className="mb-4 text-2xl font-bold">Méthodes de paiement</h2>
+  <h2 className="mb-4 text-2xl font-bold">M�thodes de paiement</h2>
 
   <div className="mb-6 grid gap-3 md:grid-cols-3">
     <input
       className="rounded-md border px-4 py-2"
-      placeholder="Nom méthode ex: D17"
+      placeholder="Nom m�thode ex: D17"
       value={newPaymentName}
       onChange={(e) => setNewPaymentName(e.target.value)}
     />
 
     <input
       className="rounded-md border px-4 py-2"
-      placeholder="Détails ex: numéro / RIB / adresse"
+      placeholder="D�tails ex: num�ro / RIB / adresse"
       value={newPaymentDetails}
       onChange={(e) => setNewPaymentDetails(e.target.value)}
     />
@@ -497,7 +496,7 @@ const clientMatchesFilters = (client: Client) => {
       onClick={addPaymentMethod}
       className="rounded-md bg-primary px-5 py-2 text-primary-foreground"
     >
-      Ajouter méthode
+      Ajouter m�thode
     </button>
   </div>
 
@@ -506,8 +505,8 @@ const clientMatchesFilters = (client: Client) => {
       <thead className="bg-muted">
         <tr>
           <th className="p-4">Nom</th>
-          <th className="p-4">Détails</th>
-          <th className="p-4">État</th>
+          <th className="p-4">D�tails</th>
+          <th className="p-4">�tat</th>
           <th className="p-4">Action</th>
         </tr>
       </thead>
@@ -564,55 +563,6 @@ const clientMatchesFilters = (client: Client) => {
     </table>
   </div>
 </div>
-  {/* ===== GESTION DES FLOATING CARDS ===== */}
-
-<h2 className="mb-4 text-2xl font-bold">
-  Gestion des Floating Cards
-</h2>
-
-<button
-  onClick={addCard}
-  className="mb-4 rounded-md bg-primary px-4 py-2 text-primary-foreground"
->
-  Ajouter une carte
-</button>
-
-{cards.map((card) => (
-  <div key={card.id} className="mb-4 rounded-lg border p-4">
-    <input
-      value={card.name}
-      onChange={(e) =>
-        updateCard(card.id, "name", e.target.value)
-      }
-    />
-
-    <input
-      value={card.category}
-      onChange={(e) =>
-        updateCard(card.id, "category", e.target.value)
-      }
-    />
-
-    <input
-      value={card.price}
-      onChange={(e) =>
-        updateCard(card.id, "price", e.target.value)
-      }
-    />
-
-    <input
-      value={card.oldPrice || ""}
-      onChange={(e) =>
-        updateCard(card.id, "oldPrice", e.target.value)
-      }
-    />
-
-    <button onClick={() => deleteCard(card.id)}>
-      Supprimer
-    </button>
-  </div>
-))}
-
 
         <div className="mb-8 rounded-2xl border bg-card p-6">
           <h2 className="mb-4 text-2xl font-bold">Ajouter produit</h2>
@@ -641,8 +591,8 @@ const clientMatchesFilters = (client: Client) => {
                 <th className="p-4">Nom</th>
                 <th className="p-4">Prix</th>
                 <th className="p-4">Ancien prix</th>
-                <th className="p-4">Catégorie</th>
-                <th className="p-4">État</th>
+                <th className="p-4">Cat�gorie</th>
+                <th className="p-4">�tat</th>
                 <th className="p-4">Actions</th>
               </tr>
             </thead>
@@ -779,7 +729,7 @@ const clientMatchesFilters = (client: Client) => {
                       category: e.target.value,
                     })
                   }
-                  placeholder="Catégorie"
+                  placeholder="Cat�gorie"
                 />
 
                 <textarea
@@ -840,7 +790,6 @@ const clientMatchesFilters = (client: Client) => {
           </div>
         )}
       </div>
-         </div>
     </main>
   );
 }
