@@ -71,6 +71,58 @@ function formatPrice(price: number) {
   return Number.isInteger(price) ? String(price) : price.toFixed(2);
 }
 
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isRewardCompatible(
+  reward: WheelReward | null,
+  productName: string
+) {
+  if (!reward || reward.used) return false;
+
+  const normalizedLabel = normalizeText(reward.label);
+  const normalizedProduct = normalizeText(productName);
+
+  // Réduction générale
+  if (normalizedLabel.includes("5% sur votre achat")) {
+    return true;
+  }
+
+  // Cas spécial : seulement 2K Followers
+  if (normalizedLabel.includes("2k followers")) {
+    const cleanProductName = normalizedProduct
+      .replace(/\s*\(followers\)\s*$/, "")
+      .trim();
+
+    return cleanProductName === "2k followers";
+  }
+
+  // Autres récompenses ciblées
+  if (normalizedLabel.includes("gemini")) {
+    return normalizedProduct.includes("gemini");
+  }
+
+  if (normalizedLabel.includes("spotify")) {
+    return normalizedProduct.includes("spotify");
+  }
+
+  if (normalizedLabel.includes("canva")) {
+    return normalizedProduct.includes("canva");
+  }
+
+  if (normalizedLabel.includes("linkedin")) {
+    return normalizedProduct.includes("linkedin");
+  }
+
+  return canUseRewardOnProduct(reward, productName);
+}
+
 function addSocialToCart(
   service: SocialService,
   type: string,
@@ -80,10 +132,10 @@ function addSocialToCart(
   const cart = JSON.parse(localStorage.getItem("cart") || "[]");
   const productName = `${service.name} (${type})`;
 
-  const rewardCanBeUsed =
-    reward !== null &&
-    !reward.used &&
-    canUseRewardOnProduct(reward, productName);
+  const rewardCanBeUsed = isRewardCompatible(
+    reward,
+    productName
+  );
 
   const finalPrice = rewardCanBeUsed
     ? calculateRewardPrice(service.price, reward.percentage)
@@ -156,10 +208,10 @@ function SocialSection({
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {services.map((service) => {
           const productName = `${service.name} (${title})`;
-          const rewardCanBeUsed =
-            wheelReward !== null &&
-            !wheelReward.used &&
-            canUseRewardOnProduct(wheelReward, productName);
+          const rewardCanBeUsed = isRewardCompatible(
+            wheelReward,
+            productName
+          );
 
           const displayedPrice = rewardCanBeUsed
             ? calculateRewardPrice(service.price, wheelReward.percentage)
@@ -290,10 +342,10 @@ export function Subscriptions() {
       .map(([slug, product]) => {
         const originalPrice = parsePrice(product.pricesByDuration?.["1 month"]);
         const oldPrice = parsePrice(product.oldPrice);
-        const rewardCanBeUsed =
-          wheelReward !== null &&
-          !wheelReward.used &&
-          canUseRewardOnProduct(wheelReward, product.name);
+        const rewardCanBeUsed = isRewardCompatible(
+          wheelReward,
+          product.name
+        );
 
         const rewardDiscount = rewardCanBeUsed ? wheelReward.percentage : 0;
 
