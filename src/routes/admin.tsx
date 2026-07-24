@@ -790,6 +790,7 @@ const clientMatchesFilters = (client: Client) => {
           </div>
         )}
       </div>
+         </div>
     </main>
   );
 }
