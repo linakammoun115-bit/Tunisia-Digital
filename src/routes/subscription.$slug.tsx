@@ -1,16 +1,23 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { savePendingCart } from "@/lib/products";
-import { useState, useEffect } from "react";
-import { getProducts } from "@/lib/products";
+import { savePendingCart, getProducts } from "@/lib/products";
+import { useState } from "react";
 import {
   ArrowLeft,
   Check,
   Clock,
+  Gift,
   ShieldCheck,
   ShoppingCart,
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+import {
+  calculateRewardPrice,
+  canUseRewardOnProduct,
+  consumeWheelReward,
+  getWheelReward,
+} from "@/lib/wheelReward";
 
 type Subscription = {
   name: string;
@@ -21,7 +28,7 @@ type Subscription = {
   description: string;
   features: string[];
   active: boolean;
-   pricesByDuration?: {
+  pricesByDuration?: {
     "1 month": string;
     "6 months": string;
     "1 year": string;
@@ -32,19 +39,31 @@ type CartItem = {
   slug: string;
   name: string;
   price: number;
+  originalPrice: number;
   duration: string;
   quantity: number;
+  wheelReward?: {
+    id: string;
+    label: string;
+    percentage: number;
+  } | null;
 };
 
-export const subscriptions= {
+export const subscriptions = {
   "canva-pro": {
     name: "Canva Pro",
     price: "10 DT",
     oldPrice: "20 DT",
     duration: "1 year",
     category: "Creative",
-    description: "Create professional designs, posts, logos and presentations with Canva Pro.",
-    features: ["1 year access", "Premium templates", "Fast activation", "WhatsApp support"],
+    description:
+      "Create professional designs, posts, logos and presentations with Canva Pro.",
+    features: [
+      "1 year access",
+      "Premium templates",
+      "Fast activation",
+      "WhatsApp support",
+    ],
     active: true,
   },
   "chatgpt-business": {
@@ -53,8 +72,14 @@ export const subscriptions= {
     oldPrice: "60 DT",
     duration: "1 month",
     category: "AI Tools",
-    description: "Premium AI assistant access for work, study, productivity and business tasks.",
-    features: ["AI premium access", "Instant activation", "Secure local payment", "Support included"],
+    description:
+      "Premium AI assistant access for work, study, productivity and business tasks.",
+    features: [
+      "AI premium access",
+      "Instant activation",
+      "Secure local payment",
+      "Support included",
+    ],
     active: true,
   },
   "capcut-pro": {
@@ -63,8 +88,14 @@ export const subscriptions= {
     oldPrice: "30 DT",
     duration: "1 month",
     category: "Creative",
-    description: "Edit videos with premium CapCut tools, effects, templates and export options.",
-    features: ["Premium editing tools", "Fast activation", "Perfect for creators", "Support included"],
+    description:
+      "Edit videos with premium CapCut tools, effects, templates and export options.",
+    features: [
+      "Premium editing tools",
+      "Fast activation",
+      "Perfect for creators",
+      "Support included",
+    ],
     active: true,
   },
   "adobe-creative-cloud-pro": {
@@ -73,8 +104,14 @@ export const subscriptions= {
     oldPrice: "80 DT",
     duration: "1 month",
     category: "Creative",
-    description: "Professional creative tools for design, editing, photography and content creation.",
-    features: ["Creative apps access", "Fast delivery", "Secure payment", "WhatsApp support"],
+    description:
+      "Professional creative tools for design, editing, photography and content creation.",
+    features: [
+      "Creative apps access",
+      "Fast delivery",
+      "Secure payment",
+      "WhatsApp support",
+    ],
     active: true,
   },
   "netflix-shared": {
@@ -83,8 +120,14 @@ export const subscriptions= {
     oldPrice: "30 DT",
     duration: "1 month",
     category: "Streaming",
-    description: "Affordable Netflix shared access with quick activation and local support.",
-    features: ["Shared profile access", "Fast delivery", "1 month duration", "Support included"],
+    description:
+      "Affordable Netflix shared access with quick activation and local support.",
+    features: [
+      "Shared profile access",
+      "Fast delivery",
+      "1 month duration",
+      "Support included",
+    ],
     active: true,
   },
   "netflix-private": {
@@ -93,8 +136,14 @@ export const subscriptions= {
     oldPrice: "70 DT",
     duration: "1 month",
     category: "Streaming",
-    description: "Private Netflix access for a smoother and more personal streaming experience.",
-    features: ["Private access", "Instant activation", "Secure payment", "Support included"],
+    description:
+      "Private Netflix access for a smoother and more personal streaming experience.",
+    features: [
+      "Private access",
+      "Instant activation",
+      "Secure payment",
+      "Support included",
+    ],
     active: true,
   },
   "netflix-essential": {
@@ -103,8 +152,14 @@ export const subscriptions= {
     oldPrice: "50 DT",
     duration: "1 month",
     category: "Streaming",
-    description: "Essential Netflix access with reliable activation and friendly support.",
-    features: ["Essential access", "Fast activation", "1 month duration", "WhatsApp support"],
+    description:
+      "Essential Netflix access with reliable activation and friendly support.",
+    features: [
+      "Essential access",
+      "Fast activation",
+      "1 month duration",
+      "WhatsApp support",
+    ],
     active: true,
   },
   "iptv-dream-4k": {
@@ -113,8 +168,14 @@ export const subscriptions= {
     oldPrice: "150 DT",
     duration: "1 year",
     category: "Streaming",
-    description: "Enjoy IPTV Dream 4K for sports, movies, series and entertainment channels.",
-    features: ["4K streaming", "1 year access", "Fast setup", "Support included"],
+    description:
+      "Enjoy IPTV Dream 4K for sports, movies, series and entertainment channels.",
+    features: [
+      "4K streaming",
+      "1 year access",
+      "Fast setup",
+      "Support included",
+    ],
     active: true,
   },
   "youtube-premium": {
@@ -124,7 +185,12 @@ export const subscriptions= {
     duration: "1 month",
     category: "Streaming",
     description: "Watch YouTube without ads and enjoy premium features.",
-    features: ["Ad-free YouTube", "Background play", "Fast activation", "Support included"],
+    features: [
+      "Ad-free YouTube",
+      "Background play",
+      "Fast activation",
+      "Support included",
+    ],
     active: true,
   },
   "spotify-premium": {
@@ -134,7 +200,12 @@ export const subscriptions= {
     duration: "1 year",
     category: "Streaming",
     description: "Enjoy unlimited music with Spotify Premium for one year.",
-    features: ["1 year access", "Music premium", "Fast activation", "Support included"],
+    features: [
+      "1 year access",
+      "Music premium",
+      "Fast activation",
+      "Support included",
+    ],
     active: true,
   },
   "linkedin-career": {
@@ -144,7 +215,12 @@ export const subscriptions= {
     duration: "3 months",
     category: "Productivity",
     description: "Boost your career with LinkedIn premium career tools.",
-    features: ["3 months access", "Career insights", "Learning features", "Support included"],
+    features: [
+      "3 months access",
+      "Career insights",
+      "Learning features",
+      "Support included",
+    ],
     active: true,
   },
   "linkedin-business": {
@@ -153,8 +229,14 @@ export const subscriptions= {
     oldPrice: "180 DT",
     duration: "3 months",
     category: "Productivity",
-    description: "LinkedIn Business access for networking, prospecting and professional growth.",
-    features: ["3 months access", "Business tools", "Premium insights", "Support included"],
+    description:
+      "LinkedIn Business access for networking, prospecting and professional growth.",
+    features: [
+      "3 months access",
+      "Business tools",
+      "Premium insights",
+      "Support included",
+    ],
     active: true,
   },
   "microsoft-office-professional-plus": {
@@ -163,8 +245,14 @@ export const subscriptions= {
     oldPrice: "140 DT",
     duration: "1 year",
     category: "Productivity",
-    description: "Professional Microsoft Office tools for documents, spreadsheets and presentations.",
-    features: ["Office apps access", "1 year duration", "Fast activation", "Support included"],
+    description:
+      "Professional Microsoft Office tools for documents, spreadsheets and presentations.",
+    features: [
+      "Office apps access",
+      "1 year duration",
+      "Fast activation",
+      "Support included",
+    ],
     active: true,
   },
   "coursera-plus": {
@@ -173,8 +261,14 @@ export const subscriptions= {
     oldPrice: "160 DT",
     duration: "1 year",
     category: "Education",
-    description: "Learn new skills with Coursera Plus and access premium learning content.",
-    features: ["1 year access", "Premium courses", "Learning certificates", "Support included"],
+    description:
+      "Learn new skills with Coursera Plus and access premium learning content.",
+    features: [
+      "1 year access",
+      "Premium courses",
+      "Learning certificates",
+      "Support included",
+    ],
     active: true,
   },
 } satisfies Record<string, Subscription>;
@@ -183,14 +277,17 @@ export const Route = createFileRoute("/subscription/$slug")({
   component: SubscriptionDetails,
 });
 
-function priceToNumber(price: string) {
-  return Number(price.replace("DT", "").trim());
+function priceToNumber(price: string | number | undefined) {
+  const normalized = String(price ?? "0")
+    .replace(",", ".")
+    .replace(/[^\d.]/g, "");
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function getDiscount(price: string, oldPrice: string) {
-  const current = priceToNumber(price);
-  const old = priceToNumber(oldPrice);
-  return Math.round((1 - current / old) * 100);
+function formatPrice(price: number) {
+  return Number.isInteger(price) ? String(price) : price.toFixed(2);
 }
 
 function getCart() {
@@ -207,12 +304,13 @@ function saveCart(cart: CartItem[]) {
   savePendingCart(cart);
   window.dispatchEvent(new Event("cart-updated"));
 }
+
 function SubscriptionDetails() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
 
   const products = getProducts();
-const subscription = products[slug];
+  const subscription = products[slug];
 
   const [selectedDuration, setSelectedDuration] = useState<
     "1 month" | "6 months" | "1 year"
@@ -220,7 +318,6 @@ const subscription = products[slug];
 
   if (!subscription) {
     return (
-
       <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
         <div className="gradient-border max-w-md rounded-3xl p-8 text-center">
           <h1 className="mb-3 text-3xl font-bold">Subscription not found</h1>
@@ -235,17 +332,6 @@ const subscription = products[slug];
         </div>
       </main>
     );
-    const pricesByDuration = subscription.pricesByDuration;
-
-const selectedPrice =
-  pricesByDuration[selectedDuration];
-
-const selectedOldPrice =
-  subscription.oldPrice;
-
-const discount =
-  getDiscount(selectedPrice, selectedOldPrice);
-
   }
 
   if (!subscription.active) {
@@ -264,32 +350,49 @@ const discount =
     );
   }
 
-  
-  const pricesByDuration =
-  (subscription as any)?.pricesByDuration || {};
+  const pricesByDuration = subscription.pricesByDuration ?? {
+    "1 month": subscription.price,
+    "6 months": subscription.price,
+    "1 year": subscription.price,
+  };
 
-const selectedPrice =
-  pricesByDuration[selectedDuration] ||
-  pricesByDuration["1 month"] ||
-  "0 DT";
+  const selectedPriceText =
+    pricesByDuration[selectedDuration] ??
+    pricesByDuration["1 month"] ??
+    subscription.price ??
+    "0 DT";
 
-console.log(
-  "selectedDuration =",
-  selectedDuration
-);
+  const originalPrice = priceToNumber(selectedPriceText);
+  const reward = getWheelReward();
 
-console.log(
-  "selectedPrice =",
-  selectedPrice
-);
+  const rewardCanBeUsed =
+    reward !== null &&
+    !reward.used &&
+    canUseRewardOnProduct(reward, subscription.name);
+
+  const displayedPrice =
+    rewardCanBeUsed && reward
+      ? calculateRewardPrice(originalPrice, reward.percentage)
+      : originalPrice;
+
   const addToCart = () => {
+    const currentReward = getWheelReward();
+
+    const canApplyReward =
+      currentReward !== null &&
+      !currentReward.used &&
+      canUseRewardOnProduct(currentReward, subscription.name);
+
+    const finalPrice =
+      canApplyReward && currentReward
+        ? calculateRewardPrice(originalPrice, currentReward.percentage)
+        : originalPrice;
+
     const cart = getCart();
-
     const cartSlug = `${slug}-${selectedDuration.replaceAll(" ", "-")}`;
-
     const existingItem = cart.find((item) => item.slug === cartSlug);
 
-    const updatedCart = existingItem
+    const updatedCart: CartItem[] = existingItem
       ? cart.map((item) =>
           item.slug === cartSlug
             ? { ...item, quantity: item.quantity + 1 }
@@ -300,13 +403,27 @@ console.log(
           {
             slug: cartSlug,
             name: `${subscription.name} - ${selectedDuration}`,
-            price: priceToNumber(selectedPrice),
+            price: finalPrice,
+            originalPrice,
             duration: selectedDuration,
             quantity: 1,
+            wheelReward:
+              canApplyReward && currentReward
+                ? {
+                    id: currentReward.id,
+                    label: currentReward.label,
+                    percentage: currentReward.percentage,
+                  }
+                : null,
           },
         ];
 
     saveCart(updatedCart);
+
+    if (canApplyReward && currentReward) {
+      consumeWheelReward(subscription.name);
+    }
+
     navigate({ to: "/cart" });
   };
 
@@ -336,7 +453,12 @@ console.log(
                   {subscription.category}
                 </span>
 
-                
+                {rewardCanBeUsed && reward && (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-4 py-1.5 text-sm font-bold text-success">
+                    <Gift className="h-4 w-4" />
+                    -{reward.percentage}% roue
+                  </span>
+                )}
               </div>
 
               <h1 className="mb-5 font-display text-4xl font-bold leading-tight md:text-6xl">
@@ -353,9 +475,7 @@ console.log(
                     <Clock className="h-4 w-4 text-primary" />
                     Duration
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedDuration}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{selectedDuration}</p>
                 </div>
 
                 <div className="glass rounded-2xl p-4">
@@ -370,7 +490,7 @@ console.log(
               </div>
 
               <ul className="grid gap-4 sm:grid-cols-2">
-                {subscription.features.map((feature) => (
+                {subscription.features.map((feature: string) => (
                   <li key={feature} className="flex items-start gap-3 text-sm">
                     <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20">
                       <Check className="h-3.5 w-3.5 text-primary" />
@@ -384,15 +504,25 @@ console.log(
             </div>
 
             <aside className="glass h-fit rounded-3xl p-6 shadow-card">
-              <p className="mb-2 text-sm text-muted-foreground">
-                Starting from
-              </p>
+              <p className="mb-2 text-sm text-muted-foreground">Starting from</p>
 
               <div className="mb-2 flex items-end gap-3">
                 <span className="gradient-text text-5xl font-bold md:text-6xl">
-                  {selectedPrice}
+                  {formatPrice(displayedPrice)} DT
                 </span>
+
+                {rewardCanBeUsed && (
+                  <span className="mb-2 text-lg text-muted-foreground line-through">
+                    {formatPrice(originalPrice)} DT
+                  </span>
+                )}
               </div>
+
+              {rewardCanBeUsed && reward && (
+                <div className="mb-5 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm font-bold text-success">
+                  🎁 {reward.label} sera appliquée dans le panier
+                </div>
+              )}
 
               <div className="mb-6">
                 <p className="mb-3 text-sm font-semibold">Choisir la durée</p>
@@ -412,9 +542,7 @@ console.log(
                       >
                         <div className="flex justify-between">
                           <span>{duration}</span>
-                          <strong>
-                            {pricesByDuration?.[duration] ?? "0 DT"}
-                          </strong>
+                          <strong>{pricesByDuration[duration] ?? "0 DT"}</strong>
                         </div>
                       </button>
                     )
@@ -441,4 +569,4 @@ console.log(
       </div>
     </main>
   );
-};
+}
