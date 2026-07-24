@@ -1,6 +1,7 @@
 import { getProducts, saveProducts, Subscription } from "@/lib/products";
 import { getClients, saveClients, Client } from "@/lib/clients";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   getPaymentMethods,
