@@ -1,3 +1,4 @@
+```ts
 export type WheelReward = {
   id: string;
   label: string;
@@ -23,7 +24,8 @@ export function getCurrentMonthKey() {
 
 export function hasSpunThisMonth() {
   return (
-    localStorage.getItem(SPIN_MONTH_KEY) === getCurrentMonthKey()
+    localStorage.getItem(SPIN_MONTH_KEY) ===
+    getCurrentMonthKey()
   );
 }
 
@@ -34,7 +36,9 @@ export function markSpinForCurrentMonth() {
   );
 }
 
-export function createWheelReward(label: string): WheelReward {
+export function createWheelReward(
+  label: string
+): WheelReward {
   const percentageMatch = label.match(/(\d+)%/);
 
   const percentage = percentageMatch
@@ -53,12 +57,16 @@ export function createWheelReward(label: string): WheelReward {
     productKeyword = "canva";
   } else if (lowerLabel.includes("linkedin")) {
     productKeyword = "linkedin";
-  } else if (
-    lowerLabel.includes("followers") ||
-    lowerLabel.includes("2k")
-  ) {
-    productKeyword = "followers";
+  } else if (lowerLabel.includes("2k followers")) {
+    // Important : uniquement le pack 2K Followers
+    productKeyword = "2k followers";
   }
+
+  /*
+    Si productKeyword reste null,
+    il s'agit d'une réduction générale comme :
+    "5% sur votre achat".
+  */
 
   return {
     id: `${Date.now()}-${Math.random()
@@ -73,7 +81,9 @@ export function createWheelReward(label: string): WheelReward {
   };
 }
 
-export function saveWheelReward(reward: WheelReward) {
+export function saveWheelReward(
+  reward: WheelReward
+) {
   localStorage.setItem(
     REWARD_KEY,
     JSON.stringify(reward)
@@ -84,8 +94,11 @@ export function saveWheelReward(reward: WheelReward) {
   );
 }
 
-export function getWheelReward(): WheelReward | null {
-  const savedReward = localStorage.getItem(REWARD_KEY);
+export function getWheelReward():
+  | WheelReward
+  | null {
+  const savedReward =
+    localStorage.getItem(REWARD_KEY);
 
   if (!savedReward) return null;
 
@@ -102,8 +115,13 @@ export function getWheelReward(): WheelReward | null {
 
     return parsed as WheelReward;
   } catch {
-    // Compatibilité avec l'ancien format texte
-    const legacyReward = createWheelReward(savedReward);
+    /*
+      Compatibilité avec l'ancien format
+      où wheelReward était enregistré comme texte.
+    */
+    const legacyReward =
+      createWheelReward(savedReward);
+
     saveWheelReward(legacyReward);
 
     return legacyReward;
@@ -114,48 +132,139 @@ function normalizeText(value: string) {
   return value
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function canUseRewardOnProduct(
   reward: WheelReward,
   productName: string
 ) {
-  if (reward.used) return false;
-
-  // Une réduction générale de 5% fonctionne sur tous les produits
-  if (!reward.productKeyword) {
-    return true;
+  if (reward.used) {
+    return false;
   }
 
-  const normalizedProduct = normalizeText(productName);
-  const normalizedKeyword = normalizeText(
-    reward.productKeyword
+  const normalizedLabel = normalizeText(
+    reward.label
   );
 
-  return normalizedProduct.includes(normalizedKeyword);
+  const normalizedProduct = normalizeText(
+    productName
+  );
+
+  /*
+    Réduction générale :
+    "5% sur votre achat"
+
+    Elle fonctionne sur n'importe quel produit.
+  */
+  if (!reward.productKeyword) {
+    return normalizedLabel.includes(
+      "5% sur votre achat"
+    );
+  }
+
+  /*
+    Produits classiques :
+    Gemini, Spotify, Canva, LinkedIn.
+  */
+  if (
+    reward.productKeyword === "gemini"
+  ) {
+    return normalizedProduct.includes(
+      "gemini"
+    );
+  }
+
+  if (
+    reward.productKeyword === "spotify"
+  ) {
+    return normalizedProduct.includes(
+      "spotify"
+    );
+  }
+
+  if (
+    reward.productKeyword === "canva"
+  ) {
+    return normalizedProduct.includes(
+      "canva"
+    );
+  }
+
+  if (
+    reward.productKeyword === "linkedin"
+  ) {
+    return normalizedProduct.includes(
+      "linkedin"
+    );
+  }
+
+  /*
+    Cas spécial :
+    "2K Followers -10%"
+
+    Dans Subscriptions.tsx, le produit est envoyé sous la forme :
+    "2K Followers (Followers)"
+
+    On enlève donc "(Followers)" puis on compare
+    exactement avec "2k followers".
+  */
+  if (
+    reward.productKeyword ===
+    "2k followers"
+  ) {
+    const socialPackageName =
+      normalizedProduct
+        .replace("(followers)", "")
+        .trim();
+
+    return (
+      socialPackageName ===
+      "2k followers"
+    );
+  }
+
+  return false;
 }
 
 export function calculateRewardPrice(
   originalPrice: number,
   percentage: number
 ) {
-  if (!percentage || percentage <= 0) {
+  if (
+    !percentage ||
+    percentage <= 0
+  ) {
     return originalPrice;
   }
 
   const discountedPrice =
-    originalPrice - originalPrice * (percentage / 100);
+    originalPrice -
+    originalPrice *
+      (percentage / 100);
 
-  return Number(discountedPrice.toFixed(2));
+  return Number(
+    discountedPrice.toFixed(2)
+  );
 }
 
-export function consumeWheelReward(productName: string) {
+export function consumeWheelReward(
+  productName: string
+) {
   const reward = getWheelReward();
 
-  if (!reward) return null;
+  if (!reward) {
+    return null;
+  }
 
-  if (!canUseRewardOnProduct(reward, productName)) {
+  if (
+    !canUseRewardOnProduct(
+      reward,
+      productName
+    )
+  ) {
     return null;
   }
 
@@ -182,3 +291,4 @@ export function removeUsedWheelReward() {
     );
   }
 }
+```
