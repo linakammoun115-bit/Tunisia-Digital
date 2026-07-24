@@ -1,7 +1,33 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowLeft, Gift, Sparkles, Trophy } from "lucide-react";
+import {
+  createFileRoute,
+  Link,
+} from "@tanstack/react-router";
+
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  ArrowLeft,
+  CalendarClock,
+  Gift,
+  Lock,
+  Sparkles,
+  Trophy,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+
+import {
+  createWheelReward,
+  getCurrentMonthKey,
+  getWheelReward,
+  hasSpunThisMonth,
+  markSpinForCurrentMonth,
+  saveWheelReward,
+} from "@/lib/wheelReward";
 
 export const Route = createFileRoute("/wheel")({
   component: WheelGame,
@@ -18,112 +44,220 @@ const prizes = [
   "2K Followers -10%",
 ];
 
+const wheelColors = [
+  "#7c3aed",
+  "#111827",
+  "#2563eb",
+  "#16a34a",
+  "#111827",
+  "#f59e0b",
+  "#dc2626",
+  "#111827",
+];
+
+const SPIN_DURATION = 5000;
+
 function WheelGame() {
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState("");
-const saveReward = (reward: string) => {
-  localStorage.setItem("wheelReward", reward);
-  window.dispatchEvent(new Event("wheel-reward-updated"));
-};
-  const spinWheel = () => {
-  if (spinning) return;
-
-  setSpinning(true);
-  setResult("");
+  const [alreadySpun, setAlreadySpun] = useState(false);
 
   const slice = 360 / prizes.length;
-  const spins = 6 + Math.floor(Math.random() * 4);
-  const extraRotation = Math.random() * 360;
 
-  const newRotation = rotation + spins * 360 + extraRotation;
+  useEffect(() => {
+    const spunThisMonth = hasSpunThisMonth();
+    setAlreadySpun(spunThisMonth);
 
-  setRotation(newRotation);
+    if (spunThisMonth) {
+      const existingReward = getWheelReward();
 
-  setTimeout(() => {
-    const normalized = ((newRotation % 360) + 360) % 360;
+      if (
+        existingReward &&
+        existingReward.spinMonth === getCurrentMonthKey() &&
+        !existingReward.used
+      ) {
+        setResult(existingReward.label);
+      }
+    }
+  }, []);
 
-    // flèche en haut + correction demi-tranche
-    const pointerAngle =
-      (360 - normalized + 22.5) % 360;
+  const wheelBackground = useMemo(() => {
+    const colorParts = wheelColors.map(
+      (color, index) => {
+        const start = index * slice;
+        const end = start + slice;
 
-    const winningIndex =
-      Math.floor(pointerAngle / slice);
-console.log({
-  normalized,
-  pointerAngle,
-  winningIndex,
-  prize: prizes[winningIndex],
-});
-    const reward = prizes[winningIndex];
-setResult(reward);
-saveReward(reward);
-    setSpinning(false);
-  }, 4500);
-};
+        return `${color} ${start}deg ${end}deg`;
+      }
+    );
+
+    return `conic-gradient(${colorParts.join(", ")})`;
+  }, [slice]);
+
+  const spinWheel = () => {
+    if (spinning || alreadySpun) return;
+
+    setSpinning(true);
+    setResult("");
+
+    /*
+      On choisit d'abord le gagnant.
+
+      Ensuite on calcule la rotation pour que le CENTRE
+      exact de sa tranche arrive sous la flèche placée en haut.
+    */
+    const winningIndex = Math.floor(
+      Math.random() * prizes.length
+    );
+
+    const winningPrize = prizes[winningIndex];
+
+    const targetCenterAngle =
+      winningIndex * slice + slice / 2;
+
+    /*
+      La flèche est à 0° en haut.
+
+      Pour mettre targetCenterAngle sous la flèche,
+      la rotation finale modulo 360 doit être :
+      360 - targetCenterAngle.
+    */
+    const desiredRotation =
+      (360 - targetCenterAngle) % 360;
+
+    const currentNormalized =
+      ((rotation % 360) + 360) % 360;
+
+    const correction =
+      (desiredRotation - currentNormalized + 360) % 360;
+
+    const completeTurns =
+      6 + Math.floor(Math.random() * 3);
+
+    const newRotation =
+      rotation + completeTurns * 360 + correction;
+
+    /*
+      On enregistre immédiatement le mois.
+      Même en rechargeant la page pendant l'animation,
+      l'utilisateur ne pourra pas rejouer.
+    */
+    markSpinForCurrentMonth();
+    setAlreadySpun(true);
+    setRotation(newRotation);
+
+    window.setTimeout(() => {
+      const reward = createWheelReward(winningPrize);
+
+      saveWheelReward(reward);
+      setResult(winningPrize);
+      setSpinning(false);
+    }, SPIN_DURATION);
+  };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background px-6 py-20 text-foreground">
-      <div className="pointer-events-none fixed inset-0 bg-grid opacity-20" />
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 py-16 text-foreground sm:px-6 md:py-20">
+      {/* BACKGROUND */}
+      <div className="bg-grid pointer-events-none fixed inset-0 opacity-20" />
+
       <div className="pointer-events-none fixed left-10 top-24 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
+
       <div className="pointer-events-none fixed bottom-10 right-10 h-80 w-80 rounded-full bg-accent/20 blur-3xl" />
 
       <div className="relative mx-auto max-w-5xl text-center">
         <Link
           to="/"
-          className="mb-8 inline-flex items-center gap-2 rounded-full border border-border/70 px-4 py-2 text-sm text-muted-foreground hover:text-primary"
+          className="mb-8 inline-flex items-center gap-2 rounded-full border border-border/70 px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/50 hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Retour accueil
         </Link>
 
+        {/* HEADER */}
         <div className="mb-10">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-primary glass">
+          <div className="glass mb-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-primary">
             <Sparkles className="h-4 w-4" />
             JEU CADEAU
           </div>
 
           <h1 className="font-display text-5xl font-bold md:text-7xl">
-            Roue des <span className="gradient-text">cadeaux</span>
+            Roue des{" "}
+            <span className="gradient-text">
+              cadeaux
+            </span>
           </h1>
 
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-            Tourne la roue et tente de gagner une réduction ou un cadeau.
+            Tourne la roue et gagne une réduction.
+            Une seule participation est autorisée par mois.
           </p>
         </div>
 
-        <div className="relative mx-auto mb-10 flex h-[360px] w-[360px] items-center justify-center md:h-[460px] md:w-[460px]">
-          <div className="absolute -top-5 z-30 h-0 w-0 border-l-[24px] border-r-[24px] border-t-[46px] border-l-transparent border-r-transparent border-t-primary drop-shadow-lg" />
+        {/* WHEEL */}
+        <div className="relative mx-auto mb-10 flex h-[330px] w-[330px] items-center justify-center sm:h-[380px] sm:w-[380px] md:h-[460px] md:w-[460px]">
+          {/* POINTER */}
+          <div className="absolute -top-3 z-40 flex flex-col items-center">
+            <div className="h-7 w-7 rounded-full border-4 border-background bg-primary shadow-xl" />
 
+            <div className="-mt-1 h-0 w-0 border-l-[22px] border-r-[22px] border-t-[44px] border-l-transparent border-r-transparent border-t-primary drop-shadow-lg" />
+          </div>
+
+          {/* GLOW */}
           <div className="absolute h-full w-full rounded-full bg-primary/20 blur-2xl" />
 
+          {/* ROTATING WHEEL */}
           <div
-            className="relative h-full w-full rounded-full border-[10px] border-primary shadow-2xl transition-transform duration-[4500ms] ease-out"
+            className="relative h-full w-full rounded-full border-[10px] border-primary shadow-2xl"
             style={{
               transform: `rotate(${rotation}deg)`,
-              background:
-                "conic-gradient(#7c3aed 0deg 45deg, #111827 45deg 90deg, #2563eb 90deg 135deg, #16a34a 135deg 180deg, #111827 180deg 225deg, #f59e0b 225deg 270deg, #dc2626 270deg 315deg, #111827 315deg 360deg)",
+              transition: spinning
+                ? `transform ${SPIN_DURATION}ms cubic-bezier(0.12, 0.72, 0.18, 1)`
+                : "none",
+              background: wheelBackground,
             }}
           >
             <div className="absolute inset-4 rounded-full border-4 border-white/20" />
+
             <div className="absolute inset-12 rounded-full border border-white/10" />
 
-            {prizes.map((prize, index) => {
-              const angle = index * 45 + 22.5;
+            {/* SEPARATION LINES */}
+            {prizes.map((_, index) => {
+              const lineAngle = index * slice;
 
               return (
                 <div
-                  key={prize + index}
-                  className="absolute left-1/2 top-1/2 flex w-32 items-center justify-center text-center text-xs font-black leading-tight text-white drop-shadow-xl"
+                  key={`line-${index}`}
+                  className="absolute left-1/2 top-1/2 h-1/2 w-[2px] origin-bottom bg-white/30"
+                  style={{
+                    transform: `
+                      translateX(-50%)
+                      translateY(-100%)
+                      rotate(${lineAngle}deg)
+                    `,
+                  }}
+                />
+              );
+            })}
+
+            {/* LABELS */}
+            {prizes.map((prize, index) => {
+              const angle =
+                index * slice + slice / 2;
+
+              return (
+                <div
+                  key={`${prize}-${index}`}
+                  className="absolute left-1/2 top-1/2 flex w-28 items-center justify-center text-center text-[10px] font-black leading-tight text-white drop-shadow-xl sm:w-32 sm:text-xs"
                   style={{
                     transform: `
                       rotate(${angle}deg)
-                      translateY(-145px)
+                      translateY(clamp(-185px, -38vw, -125px))
                       rotate(-${angle}deg)
                     `,
                     transformOrigin: "center center",
                     marginLeft: "-64px",
-                    marginTop: "-20px",
+                    marginTop: "-18px",
                   }}
                 >
                   <span className="rounded-lg bg-black/20 px-2 py-1 backdrop-blur-sm">
@@ -134,35 +268,78 @@ saveReward(reward);
             })}
           </div>
 
+          {/* CENTER BUTTON */}
           <button
+            type="button"
             onClick={spinWheel}
-            disabled={spinning}
-            className="absolute z-20 flex h-24 w-24 items-center justify-center rounded-full border-4 border-primary bg-background shadow-xl transition hover:scale-105 disabled:opacity-70 md:h-32 md:w-32"
+            disabled={spinning || alreadySpun}
+            className="absolute z-30 flex h-24 w-24 items-center justify-center rounded-full border-4 border-primary bg-background shadow-xl transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-70 md:h-32 md:w-32"
           >
             <div>
-              <Gift className="mx-auto h-8 w-8 text-primary md:h-10 md:w-10" />
+              {alreadySpun && !spinning ? (
+                <Lock className="mx-auto h-8 w-8 text-primary md:h-10 md:w-10" />
+              ) : (
+                <Gift className="mx-auto h-8 w-8 text-primary md:h-10 md:w-10" />
+              )}
+
               <p className="mt-1 text-xs font-bold md:text-sm">
-                {spinning ? "..." : "SPIN"}
+                {spinning
+                  ? "..."
+                  : alreadySpun
+                    ? "UTILISÉ"
+                    : "SPIN"}
               </p>
             </div>
           </button>
         </div>
 
+        {/* MAIN BUTTON */}
         <Button
+          type="button"
           onClick={spinWheel}
-          disabled={spinning}
-          className="h-12 border-0 gradient-primary px-10 text-primary-foreground glow-primary"
+          disabled={spinning || alreadySpun}
+          className="gradient-primary glow-primary h-12 border-0 px-10 text-primary-foreground"
         >
-          {spinning ? "La roue tourne..." : "Tourner la roue"}
+          {spinning
+            ? "La roue tourne..."
+            : alreadySpun
+              ? "Participation déjà utilisée"
+              : "Tourner la roue"}
         </Button>
 
-        {result && (
+        {alreadySpun && !spinning && (
+          <div className="mx-auto mt-5 flex max-w-md items-center justify-center gap-2 text-sm text-muted-foreground">
+            <CalendarClock className="h-4 w-4" />
+            Tu pourras rejouer le mois prochain.
+          </div>
+        )}
+
+        {/* RESULT */}
+        {result && !spinning && (
           <div className="mx-auto mt-8 max-w-md rounded-3xl border bg-card p-6 shadow-card">
-            <>
-              <Trophy className="mx-auto mb-3 h-10 w-10 text-primary" />
-              <h2 className="text-3xl font-bold">Bravo 🎁</h2>
-              <p className="mt-2 text-xl font-bold gradient-text">{result}</p>
-            </>
+            <Trophy className="mx-auto mb-3 h-10 w-10 text-primary" />
+
+            <h2 className="text-3xl font-bold">
+              Bravo 🎁
+            </h2>
+
+            <p className="gradient-text mt-2 text-xl font-bold">
+              {result}
+            </p>
+
+            <p className="mt-3 text-sm text-muted-foreground">
+              Ton offre est disponible dans la page des
+              produits. Elle sera utilisée une seule fois.
+            </p>
+
+            <Button
+              className="gradient-primary mt-5 border-0"
+              asChild
+            >
+              <Link to="/#subscriptions">
+                Voir les produits
+              </Link>
+            </Button>
           </div>
         )}
       </div>
