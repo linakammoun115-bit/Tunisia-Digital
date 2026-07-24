@@ -137,9 +137,10 @@ function addSocialToCart(
     productName
   );
 
-  const finalPrice = rewardCanBeUsed
-    ? calculateRewardPrice(service.price, reward.percentage)
-    : service.price;
+  const finalPrice =
+    rewardCanBeUsed && reward
+      ? calculateRewardPrice(service.price, reward.percentage)
+      : service.price;
 
   const slug = `social-${type}-${service.name}`
     .toLowerCase()
@@ -162,13 +163,14 @@ function addSocialToCart(
           originalPrice: service.price,
           duration: "Social Boost",
           quantity: 1,
-          wheelReward: rewardCanBeUsed
-            ? {
-                id: reward.id,
-                label: reward.label,
-                percentage: reward.percentage,
-              }
-            : null,
+          wheelReward:
+            rewardCanBeUsed && reward
+              ? {
+                  id: reward.id,
+                  label: reward.label,
+                  percentage: reward.percentage,
+                }
+              : null,
         },
       ];
 
@@ -182,7 +184,7 @@ function addSocialToCart(
   window.dispatchEvent(new Event("cart-updated"));
 
   alert(
-    rewardCanBeUsed
+    rewardCanBeUsed && reward
       ? `Produit ajouté avec l'offre : ${reward.label}`
       : "Added to cart ✅"
   );
@@ -213,9 +215,13 @@ function SocialSection({
             productName
           );
 
-          const displayedPrice = rewardCanBeUsed
-            ? calculateRewardPrice(service.price, wheelReward.percentage)
-            : service.price;
+          const displayedPrice =
+            rewardCanBeUsed && wheelReward
+              ? calculateRewardPrice(
+                  service.price,
+                  wheelReward.percentage
+                )
+              : service.price;
 
           return (
             <article
@@ -232,7 +238,7 @@ function SocialSection({
 
                   {rewardCanBeUsed && (
                     <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-success">
-                      🎁 -{wheelReward.percentage}%
+                      🎁 -{wheelReward?.percentage ?? 0}%
                     </span>
                   )}
                 </div>
@@ -347,7 +353,10 @@ export function Subscriptions() {
           product.name
         );
 
-        const rewardDiscount = rewardCanBeUsed ? wheelReward.percentage : 0;
+        const rewardDiscount =
+          rewardCanBeUsed && wheelReward
+            ? wheelReward.percentage
+            : 0;
 
         return {
           name: product.name,
