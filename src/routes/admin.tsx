@@ -563,6 +563,55 @@ const clientMatchesFilters = (client: Client) => {
     </table>
   </div>
 </div>
+  {/* ===== GESTION DES FLOATING CARDS ===== */}
+
+<h2 className="mb-4 text-2xl font-bold">
+  Gestion des Floating Cards
+</h2>
+
+<button
+  onClick={addCard}
+  className="mb-4 rounded-md bg-primary px-4 py-2 text-primary-foreground"
+>
+  Ajouter une carte
+</button>
+
+{cards.map((card) => (
+  <div key={card.id} className="mb-4 rounded-lg border p-4">
+    <input
+      value={card.name}
+      onChange={(e) =>
+        updateCard(card.id, "name", e.target.value)
+      }
+    />
+
+    <input
+      value={card.category}
+      onChange={(e) =>
+        updateCard(card.id, "category", e.target.value)
+      }
+    />
+
+    <input
+      value={card.price}
+      onChange={(e) =>
+        updateCard(card.id, "price", e.target.value)
+      }
+    />
+
+    <input
+      value={card.oldPrice || ""}
+      onChange={(e) =>
+        updateCard(card.id, "oldPrice", e.target.value)
+      }
+    />
+
+    <button onClick={() => deleteCard(card.id)}>
+      Supprimer
+    </button>
+  </div>
+))}
+
 
         <div className="mb-8 rounded-2xl border bg-card p-6">
           <h2 className="mb-4 text-2xl font-bold">Ajouter produit</h2>
