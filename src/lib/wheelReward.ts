@@ -1,20 +1,39 @@
-```ts
 export type WheelReward = {
   id: string;
   label: string;
   percentage: number;
-  productKeyword: string | null;
-  wonAt: string;
-  spinMonth: string;
+  productName?: string;
   used: boolean;
-  usedAt?: string;
-  usedOnProduct?: string;
+  createdAt: string;
 };
 
-const REWARD_KEY = "wheelReward";
-const SPIN_MONTH_KEY = "wheelLastSpinMonth";
+function getCurrentUserId(): string {
+  try {
+    const savedCustomer = localStorage.getItem("customer");
 
-export function getCurrentMonthKey() {
+    if (savedCustomer) {
+      const customer = JSON.parse(savedCustomer);
+
+      if (customer?.phone) {
+        return String(customer.phone).replace(/\s+/g, "");
+      }
+    }
+  } catch {
+    // Ignore les données invalides
+  }
+
+  return "guest";
+}
+
+function getRewardKey(): string {
+  return `wheelReward_${getCurrentUserId()}`;
+}
+
+function getSpinMonthKey(): string {
+  return `wheelLastSpinMonth_${getCurrentUserId()}`;
+}
+
+export function getCurrentMonth(): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -22,70 +41,29 @@ export function getCurrentMonthKey() {
   return `${year}-${month}`;
 }
 
-export function hasSpunThisMonth() {
-  return (
-    localStorage.getItem(SPIN_MONTH_KEY) ===
-    getCurrentMonthKey()
-  );
-}
+export function getWheelReward(): WheelReward | null {
+  try {
+    const savedReward = localStorage.getItem(getRewardKey());
 
-export function markSpinForCurrentMonth() {
-  localStorage.setItem(
-    SPIN_MONTH_KEY,
-    getCurrentMonthKey()
-  );
-}
+    if (!savedReward) {
+      return null;
+    }
 
-export function createWheelReward(
-  label: string
-): WheelReward {
-  const percentageMatch = label.match(/(\d+)%/);
+    const reward = JSON.parse(savedReward) as WheelReward;
 
-  const percentage = percentageMatch
-    ? Number(percentageMatch[1])
-    : 0;
+    if (!reward || typeof reward !== "object") {
+      return null;
+    }
 
-  const lowerLabel = label.toLowerCase();
-
-  let productKeyword: string | null = null;
-
-  if (lowerLabel.includes("gemini")) {
-    productKeyword = "gemini";
-  } else if (lowerLabel.includes("spotify")) {
-    productKeyword = "spotify";
-  } else if (lowerLabel.includes("canva")) {
-    productKeyword = "canva";
-  } else if (lowerLabel.includes("linkedin")) {
-    productKeyword = "linkedin";
-  } else if (lowerLabel.includes("2k followers")) {
-    // Important : uniquement le pack 2K Followers
-    productKeyword = "2k followers";
+    return reward;
+  } catch {
+    return null;
   }
-
-  /*
-    Si productKeyword reste null,
-    il s'agit d'une réduction générale comme :
-    "5% sur votre achat".
-  */
-
-  return {
-    id: `${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 9)}`,
-    label,
-    percentage,
-    productKeyword,
-    wonAt: new Date().toISOString(),
-    spinMonth: getCurrentMonthKey(),
-    used: false,
-  };
 }
 
-export function saveWheelReward(
-  reward: WheelReward
-) {
+export function saveWheelReward(reward: WheelReward): void {
   localStorage.setItem(
-    REWARD_KEY,
+    getRewardKey(),
     JSON.stringify(reward)
   );
 
@@ -94,201 +72,137 @@ export function saveWheelReward(
   );
 }
 
-export function getWheelReward():
-  | WheelReward
-  | null {
-  const savedReward =
-    localStorage.getItem(REWARD_KEY);
+export function setWheelReward(
+  reward: Omit<WheelReward, "used" | "createdAt">
+): WheelReward {
+  const completeReward: WheelReward = {
+    ...reward,
+    used: false,
+    createdAt: new Date().toISOString(),
+  };
 
-  if (!savedReward) return null;
+  saveWheelReward(completeReward);
 
-  try {
-    const parsed = JSON.parse(savedReward);
-
-    if (
-      typeof parsed !== "object" ||
-      parsed === null
-    ) {
-      localStorage.removeItem(REWARD_KEY);
-      return null;
-    }
-
-    return parsed as WheelReward;
-  } catch {
-    /*
-      Compatibilité avec l'ancien format
-      où wheelReward était enregistré comme texte.
-    */
-    const legacyReward =
-      createWheelReward(savedReward);
-
-    saveWheelReward(legacyReward);
-
-    return legacyReward;
-  }
-}
-
-function normalizeText(value: string) {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return completeReward;
 }
 
 export function canUseRewardOnProduct(
-  reward: WheelReward,
+  reward: WheelReward | null,
   productName: string
-) {
-  if (reward.used) {
+): boolean {
+  if (!reward || reward.used) {
     return false;
   }
 
-  const normalizedLabel = normalizeText(
-    reward.label
+  if (!reward.productName) {
+    return true;
+  }
+
+  const rewardProduct = reward.productName
+    .toLowerCase()
+    .trim();
+
+  const currentProduct = productName
+    .toLowerCase()
+    .trim();
+
+  return (
+    currentProduct.includes(rewardProduct) ||
+    rewardProduct.includes(currentProduct)
   );
-
-  const normalizedProduct = normalizeText(
-    productName
-  );
-
-  /*
-    Réduction générale :
-    "5% sur votre achat"
-
-    Elle fonctionne sur n'importe quel produit.
-  */
-  if (!reward.productKeyword) {
-    return normalizedLabel.includes(
-      "5% sur votre achat"
-    );
-  }
-
-  /*
-    Produits classiques :
-    Gemini, Spotify, Canva, LinkedIn.
-  */
-  if (
-    reward.productKeyword === "gemini"
-  ) {
-    return normalizedProduct.includes(
-      "gemini"
-    );
-  }
-
-  if (
-    reward.productKeyword === "spotify"
-  ) {
-    return normalizedProduct.includes(
-      "spotify"
-    );
-  }
-
-  if (
-    reward.productKeyword === "canva"
-  ) {
-    return normalizedProduct.includes(
-      "canva"
-    );
-  }
-
-  if (
-    reward.productKeyword === "linkedin"
-  ) {
-    return normalizedProduct.includes(
-      "linkedin"
-    );
-  }
-
-  /*
-    Cas spécial :
-    "2K Followers -10%"
-
-    Dans Subscriptions.tsx, le produit est envoyé sous la forme :
-    "2K Followers (Followers)"
-
-    On enlève donc "(Followers)" puis on compare
-    exactement avec "2k followers".
-  */
-  if (
-    reward.productKeyword ===
-    "2k followers"
-  ) {
-    const socialPackageName =
-      normalizedProduct
-        .replace("(followers)", "")
-        .trim();
-
-    return (
-      socialPackageName ===
-      "2k followers"
-    );
-  }
-
-  return false;
 }
 
 export function calculateRewardPrice(
   originalPrice: number,
   percentage: number
-) {
+): number {
+  const price = Number(originalPrice);
+  const discount = Number(percentage);
+
   if (
-    !percentage ||
-    percentage <= 0
+    !Number.isFinite(price) ||
+    !Number.isFinite(discount)
   ) {
-    return originalPrice;
+    return price;
   }
 
-  const discountedPrice =
-    originalPrice -
-    originalPrice *
-      (percentage / 100);
+  const finalPrice =
+    price - price * (discount / 100);
 
-  return Number(
-    discountedPrice.toFixed(2)
-  );
+  return Number(finalPrice.toFixed(2));
 }
 
 export function consumeWheelReward(
-  productName: string
-) {
+  productName?: string
+): void {
   const reward = getWheelReward();
 
-  if (!reward) {
-    return null;
+  if (!reward || reward.used) {
+    return;
   }
 
   if (
-    !canUseRewardOnProduct(
-      reward,
-      productName
-    )
+    productName &&
+    !canUseRewardOnProduct(reward, productName)
   ) {
-    return null;
+    return;
   }
 
-  const consumedReward: WheelReward = {
+  const usedReward: WheelReward = {
     ...reward,
     used: true,
-    usedAt: new Date().toISOString(),
-    usedOnProduct: productName,
   };
 
-  saveWheelReward(consumedReward);
+  localStorage.setItem(
+    getRewardKey(),
+    JSON.stringify(usedReward)
+  );
 
-  return consumedReward;
+  window.dispatchEvent(
+    new Event("wheel-reward-updated")
+  );
 }
 
-export function removeUsedWheelReward() {
+export function removeUsedWheelReward(): void {
   const reward = getWheelReward();
 
-  if (reward?.used) {
-    localStorage.removeItem(REWARD_KEY);
+  if (!reward || reward.used) {
+    localStorage.removeItem(getRewardKey());
 
     window.dispatchEvent(
       new Event("wheel-reward-updated")
     );
   }
 }
-```
+
+export function removeWheelReward(): void {
+  localStorage.removeItem(getRewardKey());
+
+  window.dispatchEvent(
+    new Event("wheel-reward-updated")
+  );
+}
+
+export function hasSpunThisMonth(): boolean {
+  const lastSpinMonth = localStorage.getItem(
+    getSpinMonthKey()
+  );
+
+  return lastSpinMonth === getCurrentMonth();
+}
+
+export function markSpinForCurrentMonth(): void {
+  localStorage.setItem(
+    getSpinMonthKey(),
+    getCurrentMonth()
+  );
+}
+
+export function resetWheelForTesting(): void {
+  localStorage.removeItem(getRewardKey());
+  localStorage.removeItem(getSpinMonthKey());
+
+  window.dispatchEvent(
+    new Event("wheel-reward-updated")
+  );
+}
