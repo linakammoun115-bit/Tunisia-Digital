@@ -11,14 +11,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-import {
-  calculateRewardPrice,
-  canUseRewardOnProduct,
-  consumeWheelReward,
-  getWheelReward,
-} from "@/lib/wheelReward";
-
 type Subscription = {
   name: string;
   price: string;
@@ -393,26 +385,37 @@ function SubscriptionDetails() {
     const existingItem = cart.find((item) => item.slug === cartSlug);
 
     const updatedCart: CartItem[] = existingItem
-      ? cart.map((item) =>
-          item.slug === cartSlug
-            ? canApplyReward && currentReward
-              ? {
-                  ...item,
-                  price: finalPrice,
-                  originalPrice,
-                  quantity: item.quantity + 1,
-                  wheelReward: {
-                    id: currentReward.id,
-                    label: currentReward.label,
-                    percentage: currentReward.percentage,
-                  },
-                }
-              : {
-                  ...item,
-                  quantity: item.quantity + 1,
-                }
-            : item
-        )
+  ? cart.map((item) => {
+      if (item.slug !== cartSlug) {
+        return item;
+      }
+
+      if (canApplyReward && currentReward) {
+        return {
+          ...item,
+
+          // السعر بعد التخفيض
+          price: finalPrice,
+
+          // السعر الأصلي
+          originalPrice,
+
+          // لا نزيد الكمية عند تطبيق الجائزة
+          quantity: item.quantity,
+
+          wheelReward: {
+            id: currentReward.id,
+            label: currentReward.label,
+            percentage: currentReward.percentage,
+          },
+        };
+      }
+
+      return {
+        ...item,
+        quantity: item.quantity + 1,
+      };
+    })
       : [
           ...cart,
           {
@@ -434,10 +437,6 @@ function SubscriptionDetails() {
         ];
 
     saveCart(updatedCart);
-
-    if (canApplyReward && currentReward) {
-      consumeWheelReward(subscription.name);
-    }
 
     navigate({ to: "/cart" });
   };
