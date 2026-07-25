@@ -395,7 +395,22 @@ function SubscriptionDetails() {
     const updatedCart: CartItem[] = existingItem
       ? cart.map((item) =>
           item.slug === cartSlug
-            ? { ...item, quantity: item.quantity + 1 }
+            ? canApplyReward && currentReward
+              ? {
+                  ...item,
+                  price: finalPrice,
+                  originalPrice,
+                  quantity: item.quantity + 1,
+                  wheelReward: {
+                    id: currentReward.id,
+                    label: currentReward.label,
+                    percentage: currentReward.percentage,
+                  },
+                }
+              : {
+                  ...item,
+                  quantity: item.quantity + 1,
+                }
             : item
         )
       : [
