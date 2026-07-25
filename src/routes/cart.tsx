@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { savePendingCart } from "@/lib/products";
 import { getClients, saveClients } from "@/lib/clients";
-import { removeUsedWheelReward } from "@/lib/wheelReward";
+import {
+  consumeWheelReward,
+  removeUsedWheelReward,
+} from "@/lib/wheelReward";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -94,15 +97,38 @@ function getStoredCart(): CartItem[] {
       return [];
     }
 
-    return parsed.map((item) => ({
-      ...item,
-      price: Number(item.price) || 0,
-      originalPrice:
+    return parsed.map((item) => {
+      const storedPrice = Number(item.price) || 0;
+      const originalPrice =
         item.originalPrice !== undefined
-          ? Number(item.originalPrice) || 0
-          : Number(item.price) || 0,
-      quantity: Math.max(1, Number(item.quantity) || 1),
-    }));
+          ? Number(item.originalPrice) || storedPrice
+          : storedPrice;
+
+      const rewardPercentage =
+        Number(item.wheelReward?.percentage) || 0;
+
+      /*
+        Sécurité importante :
+        si la page produit a enregistré le prix normal par erreur,
+        le panier recalcule lui-même le prix réduit.
+      */
+      const discountedPrice =
+        item.wheelReward && rewardPercentage > 0
+          ? Number(
+              (
+                originalPrice -
+                originalPrice * (rewardPercentage / 100)
+              ).toFixed(2)
+            )
+          : storedPrice;
+
+      return {
+        ...item,
+        price: discountedPrice,
+        originalPrice,
+        quantity: Math.max(1, Number(item.quantity) || 1),
+      };
+    });
   } catch {
     return [];
   }
@@ -299,9 +325,30 @@ function CartPage() {
 
     localStorage.setItem("orders", JSON.stringify(orders));
 
-    // La récompense a été utilisée et la commande est confirmée.
-    // On la supprime définitivement pour qu'elle ne réapparaisse plus.
+    /*
+      La récompense n'est consommée qu'après confirmation de la commande.
+      On récupère le produit récompensé depuis le panier.
+    */
+    const rewardedItem = cartItems.find(
+      (item) => item.wheelReward
+    );
+
+    if (rewardedItem?.wheelReward) {
+      const cleanProductName = rewardedItem.name
+        .replace(` - ${rewardedItem.duration}`, "")
+        .trim();
+
+      consumeWheelReward(cleanProductName);
+    }
+
+    /*
+      consumeWheelReward marque d'abord la récompense comme utilisée.
+      removeUsedWheelReward peut ensuite la supprimer définitivement.
+    */
     removeUsedWheelReward();
+    window.dispatchEvent(
+      new Event("wheel-reward-updated")
+    );
 
     // Vider le panier après la confirmation de la commande.
     saveCart([]);
