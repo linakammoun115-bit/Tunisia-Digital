@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { savePendingCart } from "@/lib/products";
 import { getClients, saveClients } from "@/lib/clients";
+import { removeUsedWheelReward } from "@/lib/wheelReward";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -297,6 +298,13 @@ function CartPage() {
     });
 
     localStorage.setItem("orders", JSON.stringify(orders));
+
+    // La récompense a été utilisée et la commande est confirmée.
+    // On la supprime définitivement pour qu'elle ne réapparaisse plus.
+    removeUsedWheelReward();
+
+    // Vider le panier après la confirmation de la commande.
+    saveCart([]);
 
     const text = encodeURIComponent(
       `Bonjour, je veux passer une commande ✅\n\nClient: ${customerName}\nTéléphone: ${customerPhone}\n\n${order}\n\nMode de paiement: ${
