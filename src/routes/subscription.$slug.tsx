@@ -11,6 +11,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  calculateRewardPrice,
+  canUseRewardOnProduct,
+  getWheelReward,
+} from "@/lib/wheelReward";
 type Subscription = {
   name: string;
   price: string;
@@ -282,10 +287,17 @@ function formatPrice(price: number) {
   return Number.isInteger(price) ? String(price) : price.toFixed(2);
 }
 
-function getCart() {
+function getCart(): CartItem[] {
   try {
     const storedCart = localStorage.getItem("cart");
-    return storedCart ? (JSON.parse(storedCart) as CartItem[]) : [];
+
+    if (!storedCart) {
+      return [];
+    }
+
+    const parsed = JSON.parse(storedCart);
+
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -302,7 +314,13 @@ function SubscriptionDetails() {
   const navigate = useNavigate();
 
   const products = getProducts();
-  const subscription = products[slug];
+
+  const subscription: Subscription | undefined = Array.isArray(products)
+    ? products.find(
+        (product: Subscription & { slug?: string }) =>
+          product.slug === slug
+      )
+    : (products as Record<string, Subscription>)[slug];
 
   const [selectedDuration, setSelectedDuration] = useState<
     "1 month" | "6 months" | "1 year"
@@ -385,42 +403,38 @@ function SubscriptionDetails() {
     const existingItem = cart.find((item) => item.slug === cartSlug);
 
     const updatedCart: CartItem[] = existingItem
-  ? cart.map((item) => {
-      if (item.slug !== cartSlug) {
-        return item;
-      }
+      ? cart.map((item) => {
+          if (item.slug !== cartSlug) {
+            return item;
+          }
 
-      if (canApplyReward && currentReward) {
-        return {
-          ...item,
+          /*
+            Si une récompense est disponible, on l'attache à l'article
+            existant sans augmenter la quantité. Sinon, on ajoute une unité.
+          */
+          if (canApplyReward && currentReward && !item.wheelReward) {
+            return {
+              ...item,
+              price: finalPrice,
+              originalPrice,
+              wheelReward: {
+                id: currentReward.id,
+                label: currentReward.label,
+                percentage: currentReward.percentage,
+              },
+            };
+          }
 
-          // السعر بعد التخفيض
-          price: finalPrice,
-
-          // السعر الأصلي
-          originalPrice,
-
-          // لا نزيد الكمية عند تطبيق الجائزة
-          quantity: item.quantity,
-
-          wheelReward: {
-            id: currentReward.id,
-            label: currentReward.label,
-            percentage: currentReward.percentage,
-          },
-        };
-      }
-
-      return {
-        ...item,
-        quantity: item.quantity + 1,
-      };
-    })
+          return {
+            ...item,
+            quantity: item.quantity + 1,
+          };
+        })
       : [
           ...cart,
           {
             slug: cartSlug,
-            name: `${subscription.name} - ${selectedDuration}`,
+            name: subscription.name,
             price: finalPrice,
             originalPrice,
             duration: selectedDuration,
