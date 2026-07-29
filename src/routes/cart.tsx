@@ -3,7 +3,6 @@ import { savePendingCart } from "@/lib/products";
 import { getClients, saveClients } from "@/lib/clients";
 import {
   consumeWheelReward,
-  removeUsedWheelReward,
 } from "@/lib/wheelReward";
 import {
   ArrowLeft,
@@ -307,9 +306,19 @@ function CartPage() {
       })
       .join("\n");
 
-    const orders = JSON.parse(
-      localStorage.getItem("orders") || "[]"
-    );
+    let orders: unknown[] = [];
+
+    try {
+      const storedOrders = JSON.parse(
+        localStorage.getItem("orders") || "[]"
+      );
+
+      orders = Array.isArray(storedOrders)
+        ? storedOrders
+        : [];
+    } catch {
+      orders = [];
+    }
 
     orders.push({
       id: Date.now(),
@@ -326,31 +335,25 @@ function CartPage() {
     localStorage.setItem("orders", JSON.stringify(orders));
 
     /*
-      La récompense n'est consommée qu'après confirmation de la commande.
-      On récupère le produit récompensé depuis le panier.
+      La commande est maintenant enregistrée avec succès.
+
+      La récompense est consommée seulement si elle a réellement été
+      appliquée à un produit du panier. On passe directement le nom stocké
+      dans le panier afin d'éviter un échec de correspondance lié à la durée.
     */
     const rewardedItem = cartItems.find(
-      (item) => item.wheelReward
+      (item) =>
+        item.wheelReward &&
+        item.wheelReward.percentage > 0 &&
+        item.originalPrice !== undefined &&
+        item.price < item.originalPrice
     );
 
-    if (rewardedItem?.wheelReward) {
-      const cleanProductName = rewardedItem.name
-        .replace(` - ${rewardedItem.duration}`, "")
-        .trim();
-
-      consumeWheelReward(cleanProductName);
+    if (rewardedItem) {
+      consumeWheelReward(rewardedItem.name);
     }
 
-    /*
-      consumeWheelReward marque d'abord la récompense comme utilisée.
-      removeUsedWheelReward peut ensuite la supprimer définitivement.
-    */
-    removeUsedWheelReward();
-    window.dispatchEvent(
-      new Event("wheel-reward-updated")
-    );
-
-    // Vider le panier après la confirmation de la commande.
+    // Vider le panier uniquement après l'enregistrement de la commande.
     saveCart([]);
 
     const text = encodeURIComponent(
