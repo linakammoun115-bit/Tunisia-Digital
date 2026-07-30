@@ -82,10 +82,7 @@ function WheelGame() {
 
   useEffect(() => {
     function loadWheelPrizes() {
-      const activePrizes =
-        getActiveWheelPrizes();
-
-      setPrizes(activePrizes);
+      setPrizes(getActiveWheelPrizes());
     }
 
     loadWheelPrizes();
@@ -103,9 +100,7 @@ function WheelGame() {
         existingReward &&
         !existingReward.used
       ) {
-        setResult(
-          existingReward.label
-        );
+        setResult(existingReward.label);
 
         setResultProduct(
           existingReward.productName ||
@@ -137,16 +132,15 @@ function WheelGame() {
     };
   }, []);
 
-  const activePrizes =
-    useMemo(
-      () =>
-        prizes
-          .filter(
-            (prize) => prize.active
-          )
-          .slice(0, WHEEL_SEGMENTS),
-      [prizes]
-    );
+  const activePrizes = useMemo(
+    () =>
+      prizes
+        .filter(
+          (prize) => prize.active
+        )
+        .slice(0, WHEEL_SEGMENTS),
+    [prizes]
+  );
 
   const activeCount =
     activePrizes.length;
@@ -193,8 +187,7 @@ function WheelGame() {
             name: Produit ${index + 1},
             label: "À configurer",
             percentage: 0,
-            productName:
-              Produit ${index + 1},
+            productName: Produit ${index + 1},
             color:
               FALLBACK_COLORS[index],
           };
@@ -317,14 +310,12 @@ function WheelGame() {
           className="mb-8 inline-flex items-center gap-2 rounded-full border border-border/70 px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/50 hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
-
           Retour accueil
         </Link>
 
         <section className="mb-10">
           <div className="glass mb-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-primary">
             <Sparkles className="h-4 w-4" />
-
             JEU CADEAU
           </div>
 
