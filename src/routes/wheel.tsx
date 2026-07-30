@@ -30,6 +30,7 @@ import {
 
 import {
   getActiveWheelPrizes,
+  subscribeToWheelPrizes,
   type WheelPrize,
 } from "@/lib/wheelConfig";
 
@@ -65,6 +66,12 @@ function WheelGame() {
   const [prizes, setPrizes] =
     useState<WheelPrize[]>([]);
 
+  const [loadingPrizes, setLoadingPrizes] =
+    useState(true);
+
+  const [prizesError, setPrizesError] =
+    useState<string | null>(null);
+
   const [spinning, setSpinning] =
     useState(false);
 
@@ -81,14 +88,48 @@ function WheelGame() {
     useState(false);
 
   useEffect(() => {
-    function loadWheelPrizes() {
-      const activePrizes =
-        getActiveWheelPrizes();
+    let isMounted = true;
 
-      setPrizes(activePrizes);
-    }
+    const loadWheelPrizes = async () => {
+      try {
+        const activePrizes =
+          await getActiveWheelPrizes();
 
-    loadWheelPrizes();
+        if (!isMounted) {
+          return;
+        }
+
+        setPrizes(activePrizes);
+        setPrizesError(null);
+      } catch (error) {
+        console.error(
+          "Erreur chargement roue:",
+          error
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        setPrizes([]);
+
+        setPrizesError(
+          error instanceof Error
+            ? error.message
+            : "Impossible de charger les récompenses."
+        );
+      } finally {
+        if (isMounted) {
+          setLoadingPrizes(false);
+        }
+      }
+    };
+
+    const handleWheelUpdate = () => {
+      void loadWheelPrizes();
+    };
+
+    void loadWheelPrizes();
 
     const spunThisMonth =
       hasSpunThisMonth();
@@ -116,24 +157,33 @@ function WheelGame() {
 
     window.addEventListener(
       "wheel-config-updated",
-      loadWheelPrizes
+      handleWheelUpdate
     );
 
     window.addEventListener(
       "storage",
-      loadWheelPrizes
+      handleWheelUpdate
     );
 
+    const unsubscribeRealtime =
+      subscribeToWheelPrizes(
+        handleWheelUpdate
+      );
+
     return () => {
+      isMounted = false;
+
       window.removeEventListener(
         "wheel-config-updated",
-        loadWheelPrizes
+        handleWheelUpdate
       );
 
       window.removeEventListener(
         "storage",
-        loadWheelPrizes
+        handleWheelUpdate
       );
+
+      unsubscribeRealtime();
     };
   }, []);
 
@@ -153,13 +203,18 @@ function WheelGame() {
   const totalPercentage =
     activePrizes.reduce(
       (total, prize) =>
-        total + prize.percentage,
+        total +
+        Number(
+          prize.percentage || 0
+        ),
       0
     );
 
   const wheelIsValid =
     activeCount === WHEEL_SEGMENTS &&
-    totalPercentage === 100;
+    Math.abs(
+      totalPercentage - 100
+    ) < 0.001;
 
   const segments =
     useMemo<WheelSegment[]>(() => {
@@ -314,6 +369,59 @@ function WheelGame() {
     }, SPIN_DURATION);
   }
 
+  if (loadingPrizes) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <div className="text-center">
+          <Sparkles className="mx-auto h-10 w-10 animate-pulse text-primary" />
+
+          <p className="mt-4 text-lg font-semibold">
+            Chargement de la roue...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (prizesError) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+        <section className="w-full max-w-md rounded-3xl border border-red-500/40 bg-card p-8 text-center shadow-xl">
+          <TriangleAlert className="mx-auto h-12 w-12 text-red-500" />
+
+          <h1 className="mt-4 text-2xl font-bold">
+            Impossible de charger la roue
+          </h1>
+
+          <p className="mt-3 text-sm text-muted-foreground">
+            {prizesError}
+          </p>
+
+          <Button
+            type="button"
+            onClick={() =>
+              window.location.reload()
+            }
+            className="gradient-primary mt-6 border-0"
+          >
+            Réessayer
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-3 w-full"
+            asChild
+          >
+            <Link to="/">
+              Retour à l’accueil
+            </Link>
+          </Button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 py-14 text-foreground sm:px-6 md:py-20">
       <div className="pointer-events-none fixed inset-0 bg-grid opacity-20" />
@@ -400,7 +508,9 @@ function WheelGame() {
                 </p>
               )}
 
-              {totalPercentage !== 100 && (
+              {Math.abs(
+                totalPercentage - 100
+              ) >= 0.001 && (
                 <p>
                   Le total des
                   pourcentages saisis dans
@@ -480,7 +590,11 @@ function WheelGame() {
 
                 return (
                   <div
-                    key={segment.id}
+                    key={
+                      segment.id +
+                      "-" +
+                      index
+                    }
                     className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex w-[96px] flex-col items-center justify-center text-center text-white sm:w-[112px] md:w-[125px]"
                     style={{
                       transform:
