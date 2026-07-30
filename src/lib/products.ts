@@ -1,3 +1,4 @@
+import { supabase } from "@/lib/supabase";
 export type DurationKey = "1 month" | "6 months" | "1 year";
 
 export type DurationPrice = Record<DurationKey, string>;
