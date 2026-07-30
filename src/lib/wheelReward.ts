@@ -4,7 +4,14 @@ export type WheelReward = {
   percentage: number;
   productName?: string;
   used: boolean;
+
+  // Date de création de la récompense.
   createdAt: string;
+
+  // La promotion expire une heure après sa création.
+  expiresAt: number;
+
+  // Date d'utilisation de la récompense.
   usedAt?: string;
 };
 
@@ -21,20 +28,60 @@ const WHEEL_REWARD_KEY =
 const WHEEL_SPIN_MONTH_KEY =
   "wheel-spin-month";
 
+const REWARD_DURATION_MS =
+  60 * 60 * 1000;
+
 function isBrowser() {
-  return typeof window !== "undefined";
+  return typeof window !==
+    "undefined";
 }
 
 export function getCurrentMonthKey() {
   const now = new Date();
 
-  const year = now.getFullYear();
+  const year =
+    now.getFullYear();
 
   const month = String(
     now.getMonth() + 1
   ).padStart(2, "0");
 
-  return `${year}-${month}`;
+  return year + "-" + month;
+}
+
+export function saveWheelReward(
+  reward: WheelReward
+) {
+  if (!isBrowser()) {
+    return;
+  }
+
+  localStorage.setItem(
+    WHEEL_REWARD_KEY,
+    JSON.stringify(reward)
+  );
+
+  window.dispatchEvent(
+    new Event(
+      "wheel-reward-updated"
+    )
+  );
+}
+
+export function removeWheelReward() {
+  if (!isBrowser()) {
+    return;
+  }
+
+  localStorage.removeItem(
+    WHEEL_REWARD_KEY
+  );
+
+  window.dispatchEvent(
+    new Event(
+      "wheel-reward-updated"
+    )
+  );
 }
 
 export function getWheelReward():
@@ -56,40 +103,92 @@ export function getWheelReward():
 
     const parsed = JSON.parse(
       storedReward
-    ) as WheelReward;
+    ) as Partial<WheelReward>;
 
     if (
       !parsed ||
-      typeof parsed !== "object" ||
-      typeof parsed.id !== "string" ||
-      typeof parsed.label !== "string" ||
+      typeof parsed !==
+        "object" ||
+      typeof parsed.id !==
+        "string" ||
+      typeof parsed.label !==
+        "string" ||
       typeof parsed.percentage !==
         "number"
     ) {
+      removeWheelReward();
       return null;
     }
 
-    return parsed;
+    /*
+      Compatibilité avec les anciennes
+      récompenses enregistrées avant
+      l'ajout de expiresAt.
+    */
+    let expiresAt =
+      Number(parsed.expiresAt);
+
+    if (
+      !Number.isFinite(expiresAt)
+    ) {
+      const createdAtTime =
+        typeof parsed.createdAt ===
+        "string"
+          ? new Date(
+              parsed.createdAt
+            ).getTime()
+          : Date.now();
+
+      expiresAt =
+        createdAtTime +
+        REWARD_DURATION_MS;
+    }
+
+    const normalizedReward: WheelReward =
+      {
+        id: parsed.id,
+        label: parsed.label,
+        percentage:
+          parsed.percentage,
+        productName:
+          typeof parsed.productName ===
+          "string"
+            ? parsed.productName
+            : undefined,
+        used:
+          parsed.used === true,
+        createdAt:
+          typeof parsed.createdAt ===
+          "string"
+            ? parsed.createdAt
+            : new Date().toISOString(),
+        expiresAt,
+        usedAt:
+          typeof parsed.usedAt ===
+          "string"
+            ? parsed.usedAt
+            : undefined,
+      };
+
+    /*
+      Si la récompense n'est pas encore
+      utilisée mais que l'heure est passée,
+      elle est supprimée automatiquement.
+    */
+    if (
+      !normalizedReward.used &&
+      Date.now() >=
+        normalizedReward.expiresAt
+    ) {
+      removeWheelReward();
+      return null;
+    }
+
+    return normalizedReward;
   } catch {
+    removeWheelReward();
     return null;
   }
-}
-
-export function saveWheelReward(
-  reward: WheelReward
-) {
-  if (!isBrowser()) {
-    return;
-  }
-
-  localStorage.setItem(
-    WHEEL_REWARD_KEY,
-    JSON.stringify(reward)
-  );
-
-  window.dispatchEvent(
-    new Event("wheel-reward-updated")
-  );
 }
 
 export function createWheelReward(
@@ -97,8 +196,14 @@ export function createWheelReward(
 ): WheelReward {
   const percentage = Math.min(
     100,
-    Math.max(0, input.percentage)
+    Math.max(
+      0,
+      Number(input.percentage) ||
+        0
+    )
   );
+
+  const now = Date.now();
 
   const reward: WheelReward = {
     id: input.id,
@@ -109,12 +214,23 @@ export function createWheelReward(
       undefined,
     used: false,
     createdAt:
-      new Date().toISOString(),
+      new Date(now).toISOString(),
+    expiresAt:
+      now + REWARD_DURATION_MS,
   };
 
   saveWheelReward(reward);
 
   return reward;
+}
+
+export function isWheelRewardExpired(
+  reward: WheelReward
+) {
+  return (
+    Date.now() >=
+    reward.expiresAt
+  );
 }
 
 export function hasSpunThisMonth() {
@@ -144,7 +260,9 @@ export function markSpinForCurrentMonth() {
   );
 
   window.dispatchEvent(
-    new Event("wheel-spin-updated")
+    new Event(
+      "wheel-spin-updated"
+    )
   );
 }
 
@@ -161,7 +279,11 @@ export function canUseRewardOnProduct(
   reward: WheelReward | null,
   productName: string
 ) {
-  if (!reward || reward.used) {
+  if (
+    !reward ||
+    reward.used ||
+    isWheelRewardExpired(reward)
+  ) {
     return false;
   }
 
@@ -173,8 +295,9 @@ export function canUseRewardOnProduct(
   }
 
   /*
-    Pas de productName =
-    réduction valable sur tous les produits.
+    Si aucun produit n'est précisé,
+    la récompense est valable sur
+    tous les produits.
   */
   if (!reward.productName) {
     return true;
@@ -186,10 +309,13 @@ export function canUseRewardOnProduct(
     );
 
   const selectedProduct =
-    normalizeProductName(productName);
+    normalizeProductName(
+      productName
+    );
 
   return (
-    rewardProduct === selectedProduct ||
+    rewardProduct ===
+      selectedProduct ||
     selectedProduct.includes(
       rewardProduct
     ) ||
@@ -204,16 +330,22 @@ export function calculateRewardPrice(
   percentage: number
 ) {
   if (
-    !Number.isFinite(originalPrice) ||
+    !Number.isFinite(
+      originalPrice
+    ) ||
     originalPrice < 0
   ) {
     return 0;
   }
 
-  const safePercentage = Math.min(
-    100,
-    Math.max(0, percentage)
-  );
+  const safePercentage =
+    Math.min(
+      100,
+      Math.max(
+        0,
+        Number(percentage) || 0
+      )
+    );
 
   const discountedPrice =
     originalPrice *
@@ -227,9 +359,14 @@ export function calculateRewardPrice(
 export function consumeWheelReward(
   productName?: string
 ) {
-  const reward = getWheelReward();
+  const reward =
+    getWheelReward();
 
-  if (!reward || reward.used) {
+  if (
+    !reward ||
+    reward.used ||
+    isWheelRewardExpired(reward)
+  ) {
     return false;
   }
 
@@ -243,34 +380,55 @@ export function consumeWheelReward(
     return false;
   }
 
-  const consumedReward: WheelReward = {
-    ...reward,
-    used: true,
-    usedAt: new Date().toISOString(),
-  };
+  const consumedReward: WheelReward =
+    {
+      ...reward,
+      used: true,
+      usedAt:
+        new Date().toISOString(),
+    };
 
-  saveWheelReward(consumedReward);
+  saveWheelReward(
+    consumedReward
+  );
 
   return true;
 }
 
-export function removeWheelReward() {
-  if (!isBrowser()) {
-    return;
+/*
+  Alias utile si une autre page importe
+  encore useWheelReward.
+*/
+export function useWheelReward() {
+  const reward =
+    getWheelReward();
+
+  if (
+    !reward ||
+    reward.used ||
+    isWheelRewardExpired(reward)
+  ) {
+    return null;
   }
 
-  localStorage.removeItem(
-    WHEEL_REWARD_KEY
+  const consumedReward: WheelReward =
+    {
+      ...reward,
+      used: true,
+      usedAt:
+        new Date().toISOString(),
+    };
+
+  saveWheelReward(
+    consumedReward
   );
 
-  window.dispatchEvent(
-    new Event("wheel-reward-updated")
-  );
+  return consumedReward;
 }
 
 /*
-  Fonctions utiles pour tester depuis
-  l'administration sur le même navigateur.
+  Fonctions utiles pour les tests
+  depuis l'administration.
 */
 
 export function resetMonthlyWheelSpin() {
@@ -283,7 +441,9 @@ export function resetMonthlyWheelSpin() {
   );
 
   window.dispatchEvent(
-    new Event("wheel-spin-updated")
+    new Event(
+      "wheel-spin-updated"
+    )
   );
 }
 
@@ -301,121 +461,14 @@ export function resetWheelRewardSystem() {
   );
 
   window.dispatchEvent(
-    new Event("wheel-reward-updated")
+    new Event(
+      "wheel-reward-updated"
+    )
   );
 
   window.dispatchEvent(
-    new Event("wheel-spin-updated")
-  );
-}
-export type WheelReward = {
-  id: string;
-  label: string;
-  percentage: number;
-  productName: string;
-  createdAt: number;
-  expiresAt: number;
-  used: boolean;
-};
-
-const WHEEL_REWARD_KEY = "wheel-reward";
-
-export function createWheelReward({
-  id,
-  label,
-  percentage,
-  productName,
-}: {
-  id: string;
-  label: string;
-  percentage: number;
-  productName: string;
-}) {
-  const now = Date.now();
-
-  const reward: WheelReward = {
-    id,
-    label,
-    percentage,
-    productName,
-    createdAt: now,
-    expiresAt: now + 60 * 60 * 1000,
-    used: false,
-  };
-
-  localStorage.setItem(
-    WHEEL_REWARD_KEY,
-    JSON.stringify(reward)
-  );
-
-  window.dispatchEvent(
-    new Event("wheel-reward-updated")
-  );
-
-  return reward;
-}
-
-export function getWheelReward(): WheelReward | null {
-  const savedReward =
-    localStorage.getItem(WHEEL_REWARD_KEY);
-
-  if (!savedReward) {
-    return null;
-  }
-
-  try {
-    const reward =
-      JSON.parse(savedReward) as WheelReward;
-
-    if (
-      !reward.used &&
-      Date.now() >= reward.expiresAt
-    ) {
-      removeWheelReward();
-      return null;
-    }
-
-    return reward;
-  } catch {
-    removeWheelReward();
-    return null;
-  }
-}
-
-export function isWheelRewardExpired(
-  reward: WheelReward
-) {
-  return Date.now() >= reward.expiresAt;
-}
-
-export function useWheelReward() {
-  const reward = getWheelReward();
-
-  if (!reward || reward.used) {
-    return null;
-  }
-
-  const usedReward: WheelReward = {
-    ...reward,
-    used: true,
-  };
-
-  localStorage.setItem(
-    WHEEL_REWARD_KEY,
-    JSON.stringify(usedReward)
-  );
-
-  window.dispatchEvent(
-    new Event("wheel-reward-updated")
-  );
-
-  return usedReward;
-}
-
-export function removeWheelReward() {
-  localStorage.removeItem(WHEEL_REWARD_KEY);
-
-  window.dispatchEvent(
-    new Event("wheel-reward-updated")
+    new Event(
+      "wheel-spin-updated"
+    )
   );
 }
