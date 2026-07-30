@@ -4,6 +4,7 @@ import {
 } from "@tanstack/react-router";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -15,6 +16,7 @@ import {
   CheckCircle2,
   Edit3,
   Gift,
+  Loader2,
   Plus,
   Save,
   Trash2,
@@ -29,6 +31,7 @@ import {
   deleteWheelPrize,
   getWheelPrizes,
   saveWheelPrizes,
+  subscribeToWheelPrizes,
   updateWheelPrize,
   type WheelPrize,
 } from "@/lib/wheelConfig";
@@ -68,6 +71,14 @@ const EMPTY_FORM: PrizeForm = {
   active: true,
 };
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Une erreur est survenue.";
+}
+
 function AdminWheelPage() {
   const [prizes, setPrizes] =
     useState<WheelPrize[]>([]);
@@ -81,13 +92,46 @@ function AdminWheelPage() {
   const [message, setMessage] =
     useState("");
 
-  useEffect(() => {
-    loadPrizes();
-  }, []);
+  const [loading, setLoading] =
+    useState(true);
 
-  function loadPrizes() {
-    setPrizes(getWheelPrizes());
-  }
+  const [saving, setSaving] =
+    useState(false);
+
+  const loadPrizes = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
+      }
+
+      try {
+        const data =
+          await getWheelPrizes();
+
+        setPrizes(data);
+      } catch (error) {
+        setMessage(
+          getErrorMessage(error)
+        );
+      } finally {
+        if (showLoading) {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    void loadPrizes();
+
+    const unsubscribe =
+      subscribeToWheelPrizes(() => {
+        void loadPrizes(false);
+      });
+
+    return unsubscribe;
+  }, [loadPrizes]);
 
   const activePrizes = useMemo(
     () =>
@@ -103,16 +147,19 @@ function AdminWheelPage() {
   const totalPercentage =
     activePrizes.reduce(
       (total, prize) =>
-        total + prize.percentage,
+        total +
+        Number(prize.percentage || 0),
       0
     );
 
   const wheelIsValid =
     activeCount === MAX_ACTIVE_PRIZES &&
-    totalPercentage === 100;
+    Math.abs(
+      totalPercentage - 100
+    ) < 0.001;
 
   function updateForm<
-    Key extends keyof PrizeForm
+    Key extends keyof PrizeForm,
   >(
     key: Key,
     value: PrizeForm[Key]
@@ -135,10 +182,10 @@ function AdminWheelPage() {
 
     window.setTimeout(() => {
       setMessage("");
-    }, 3000);
+    }, 4000);
   }
 
-  function handleSubmit(
+  async function handleSubmit(
     event: FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
@@ -207,25 +254,38 @@ function AdminWheelPage() {
       active: form.active,
     };
 
-    if (editingId) {
-      updateWheelPrize(
-        editingId,
-        prizeData
-      );
+    setSaving(true);
 
-      showMessage(
-        "Récompense modifiée."
-      );
-    } else {
-      addWheelPrize(prizeData);
+    try {
+      if (editingId) {
+        await updateWheelPrize(
+          editingId,
+          prizeData
+        );
 
+        showMessage(
+          "Récompense modifiée avec succès."
+        );
+      } else {
+        await addWheelPrize(
+          prizeData
+        );
+
+        showMessage(
+          "Récompense ajoutée avec succès."
+        );
+      }
+
+      resetForm();
+
+      await loadPrizes(false);
+    } catch (error) {
       showMessage(
-        "Récompense ajoutée."
+        getErrorMessage(error)
       );
+    } finally {
+      setSaving(false);
     }
-
-    resetForm();
-    loadPrizes();
   }
 
   function handleEdit(
@@ -250,31 +310,46 @@ function AdminWheelPage() {
     });
   }
 
-  function handleDelete(
-  prize: WheelPrize
-) {
-  const confirmed = window.confirm(
-    'Supprimer "' + prize.name + '" ?'
-  );
+  async function handleDelete(
+    prize: WheelPrize
+  ) {
+    const confirmed =
+      window.confirm(
+        Supprimer "${prize.name}" ?
+      );
 
-  if (!confirmed) {
-    return;
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await deleteWheelPrize(
+        prize.id
+      );
+
+      if (
+        editingId === prize.id
+      ) {
+        resetForm();
+      }
+
+      await loadPrizes(false);
+
+      showMessage(
+        "Récompense supprimée."
+      );
+    } catch (error) {
+      showMessage(
+        getErrorMessage(error)
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
-  deleteWheelPrize(prize.id);
-
-  if (editingId === prize.id) {
-    resetForm();
-  }
-
-  loadPrizes();
-
-  showMessage(
-    "Récompense supprimée."
-  );
-}
-
-  function handleToggleActive(
+  async function handleToggleActive(
     prize: WheelPrize
   ) {
     if (
@@ -287,22 +362,63 @@ function AdminWheelPage() {
       return;
     }
 
-    updateWheelPrize(prize.id, {
-      active: !prize.active,
-    });
+    setSaving(true);
 
-    loadPrizes();
+    try {
+      await updateWheelPrize(
+        prize.id,
+        {
+          active:
+            !prize.active,
+        }
+      );
+
+      await loadPrizes(false);
+
+      showMessage(
+        prize.active
+          ? "Récompense désactivée."
+          : "Récompense activée."
+      );
+    } catch (error) {
+      showMessage(
+        getErrorMessage(error)
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleSaveOrder() {
-    saveWheelPrizes(prizes);
+  async function handleSaveOrder() {
+    if (!wheelIsValid) {
+      showMessage(
+        "Il faut exactement 8 récompenses actives avec un total de 100 %."
+      );
+      return;
+    }
 
-    showMessage(
-      "Configuration enregistrée."
-    );
+    setSaving(true);
+
+    try {
+      await saveWheelPrizes(
+        prizes
+      );
+
+      await loadPrizes(false);
+
+      showMessage(
+        "Configuration enregistrée sur tous les appareils."
+      );
+    } catch (error) {
+      showMessage(
+        getErrorMessage(error)
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function movePrize(
+  async function movePrize(
     index: number,
     direction: -1 | 1
   ) {
@@ -327,7 +443,25 @@ function AdminWheelPage() {
     ];
 
     setPrizes(updated);
-    saveWheelPrizes(updated);
+    setSaving(true);
+
+    try {
+      await saveWheelPrizes(
+        updated
+      );
+
+      showMessage(
+        "Ordre enregistré."
+      );
+    } catch (error) {
+      setPrizes(prizes);
+
+      showMessage(
+        getErrorMessage(error)
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -356,10 +490,22 @@ function AdminWheelPage() {
 
           <Button
             type="button"
-            onClick={handleSaveOrder}
+            onClick={() => {
+              void handleSaveOrder();
+            }}
             variant="outline"
+            disabled={
+              saving ||
+              loading ||
+              !wheelIsValid
+            }
           >
-            <Save className="mr-2 h-4 w-4" />
+            {saving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+
             Enregistrer
           </Button>
         </header>
@@ -395,7 +541,10 @@ function AdminWheelPage() {
 
             <p
               className={`mt-3 text-4xl font-bold ${
-                totalPercentage === 100
+                Math.abs(
+                  totalPercentage -
+                    100
+                ) < 0.001
                   ? "text-green-500"
                   : "text-red-500"
               }`}
@@ -446,10 +595,11 @@ function AdminWheelPage() {
                 </p>
               )}
 
-              {totalPercentage !== 100 && (
+              {Math.abs(
+                totalPercentage - 100
+              ) >= 0.001 && (
                 <p>
                   Le total des pourcentages
-                  des récompenses actives
                   doit être égal à 100 %.
                 </p>
               )}
@@ -469,7 +619,7 @@ function AdminWheelPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Choisissez le produit, le
                 texte, le pourcentage et la
-                couleur de chaque partie.
+                couleur.
               </p>
             </div>
 
@@ -479,6 +629,7 @@ function AdminWheelPage() {
                 variant="ghost"
                 size="icon"
                 onClick={resetForm}
+                disabled={saving}
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -486,7 +637,11 @@ function AdminWheelPage() {
           </div>
 
           <form
-            onSubmit={handleSubmit}
+            onSubmit={(event) => {
+              void handleSubmit(
+                event
+              );
+            }}
             className="grid gap-5 md:grid-cols-2"
           >
             <label className="space-y-2">
@@ -513,7 +668,9 @@ function AdminWheelPage() {
               </span>
 
               <input
-                value={form.productName}
+                value={
+                  form.productName
+                }
                 onChange={(event) =>
                   updateForm(
                     "productName",
@@ -553,7 +710,9 @@ function AdminWheelPage() {
                 min="0"
                 max="100"
                 step="1"
-                value={form.percentage}
+                value={
+                  form.percentage
+                }
                 onChange={(event) =>
                   updateForm(
                     "percentage",
@@ -658,18 +817,19 @@ function AdminWheelPage() {
               <Button
                 type="submit"
                 className="gradient-primary border-0"
+                disabled={saving}
               >
-                {editingId ? (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Enregistrer les modifications
-                  </>
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : editingId ? (
+                  <Save className="mr-2 h-4 w-4" />
                 ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Ajouter la récompense
-                  </>
+                  <Plus className="mr-2 h-4 w-4" />
                 )}
+
+                {editingId
+                  ? "Enregistrer les modifications"
+                  : "Ajouter la récompense"}
               </Button>
 
               {editingId && (
@@ -677,6 +837,7 @@ function AdminWheelPage() {
                   type="button"
                   variant="outline"
                   onClick={resetForm}
+                  disabled={saving}
                 >
                   Annuler
                 </Button>
@@ -692,13 +853,19 @@ function AdminWheelPage() {
             </h2>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              Les 8 récompenses actives
-              seront affichées dans la roue
-              selon cet ordre.
+              Les récompenses sont
+              enregistrées dans Supabase et
+              partagées avec tous les
+              appareils.
             </p>
           </div>
 
-          {prizes.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center gap-3 p-12 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              Chargement...
+            </div>
+          ) : prizes.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
               <Gift className="mx-auto mb-4 h-10 w-10" />
               Aucune récompense configurée.
@@ -769,13 +936,16 @@ function AdminWheelPage() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        disabled={index === 0}
-                        onClick={() =>
-                          movePrize(
+                        disabled={
+                          saving ||
+                          index === 0
+                        }
+                        onClick={() => {
+                          void movePrize(
                             index,
                             -1
-                          )
-                        }
+                          );
+                        }}
                       >
                         ↑
                       </Button>
@@ -785,15 +955,17 @@ function AdminWheelPage() {
                         size="sm"
                         variant="outline"
                         disabled={
+                          saving ||
                           index ===
-                          prizes.length - 1
+                            prizes.length -
+                              1
                         }
-                        onClick={() =>
-                          movePrize(
+                        onClick={() => {
+                          void movePrize(
                             index,
                             1
-                          )
-                        }
+                          );
+                        }}
                       >
                         ↓
                       </Button>
@@ -802,11 +974,12 @@ function AdminWheelPage() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() =>
-                          handleToggleActive(
+                        disabled={saving}
+                        onClick={() => {
+                          void handleToggleActive(
                             prize
-                          )
-                        }
+                          );
+                        }}
                       >
                         {prize.active
                           ? "Désactiver"
@@ -817,8 +990,11 @@ function AdminWheelPage() {
                         type="button"
                         size="sm"
                         variant="outline"
+                        disabled={saving}
                         onClick={() =>
-                          handleEdit(prize)
+                          handleEdit(
+                            prize
+                          )
                         }
                       >
                         <Edit3 className="h-4 w-4" />
@@ -828,9 +1004,12 @@ function AdminWheelPage() {
                         type="button"
                         size="sm"
                         variant="destructive"
-                        onClick={() =>
-                          handleDelete(prize)
-                        }
+                        disabled={saving}
+                        onClick={() => {
+                          void handleDelete(
+                            prize
+                          );
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
