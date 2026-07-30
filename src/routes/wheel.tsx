@@ -82,7 +82,10 @@ function WheelGame() {
 
   useEffect(() => {
     function loadWheelPrizes() {
-      setPrizes(getActiveWheelPrizes());
+      const activePrizes =
+        getActiveWheelPrizes();
+
+      setPrizes(activePrizes);
     }
 
     loadWheelPrizes();
@@ -100,7 +103,9 @@ function WheelGame() {
         existingReward &&
         !existingReward.used
       ) {
-        setResult(existingReward.label);
+        setResult(
+          existingReward.label
+        );
 
         setResultProduct(
           existingReward.productName ||
@@ -183,11 +188,15 @@ function WheelGame() {
           }
 
           return {
-            id: empty-${index},
-            name: Produit ${index + 1},
+            id: "empty-" + index,
+            name:
+              "Produit " +
+              (index + 1),
             label: "À configurer",
             percentage: 0,
-            productName: Produit ${index + 1},
+            productName:
+              "Produit " +
+              (index + 1),
             color:
               FALLBACK_COLORS[index],
           };
@@ -206,13 +215,22 @@ function WheelGame() {
             const end =
               start + SLICE_ANGLE;
 
-            return ${segment.color} ${start}deg ${end}deg;
+            return (
+              segment.color +
+              " " +
+              start +
+              "deg " +
+              end +
+              "deg"
+            );
           }
         );
 
-      return `conic-gradient(from 0deg, ${parts.join(
-        ", "
-      )})`;
+      return (
+        "conic-gradient(from 0deg, " +
+        parts.join(", ") +
+        ")"
+      );
     }, [segments]);
 
   function spinWheel() {
@@ -310,12 +328,14 @@ function WheelGame() {
           className="mb-8 inline-flex items-center gap-2 rounded-full border border-border/70 px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/50 hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
+
           Retour accueil
         </Link>
 
         <section className="mb-10">
           <div className="glass mb-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-primary">
             <Sparkles className="h-4 w-4" />
+
             JEU CADEAU
           </div>
 
@@ -404,10 +424,15 @@ function WheelGame() {
           <div
             className="relative h-full w-full overflow-hidden rounded-full border-[10px] border-primary shadow-2xl"
             style={{
-              transform: rotate(${rotation}deg),
+              transform:
+                "rotate(" +
+                rotation +
+                "deg)",
 
               transition: spinning
-                ? transform ${SPIN_DURATION}ms cubic-bezier(0.12, 0.72, 0.18, 1)
+                ? "transform " +
+                  SPIN_DURATION +
+                  "ms cubic-bezier(0.12, 0.72, 0.18, 1)"
                 : "none",
 
               background:
@@ -426,14 +451,20 @@ function WheelGame() {
 
                 return (
                   <div
-                    key={`line-${segment.id}-${index}`}
+                    key={
+                      "line-" +
+                      segment.id +
+                      "-" +
+                      index
+                    }
                     className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-1/2 w-[3px] origin-bottom bg-white/70"
                     style={{
-                      transform: `
-                        translateX(-50%)
-                        translateY(-100%)
-                        rotate(${angle}deg)
-                      `,
+                      transform:
+                        "translateX(-50%) " +
+                        "translateY(-100%) " +
+                        "rotate(" +
+                        angle +
+                        "deg)",
                     }}
                   />
                 );
@@ -452,17 +483,22 @@ function WheelGame() {
                     key={segment.id}
                     className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex w-[96px] flex-col items-center justify-center text-center text-white sm:w-[112px] md:w-[125px]"
                     style={{
-                      transform: `
-                        translate(-50%, -50%)
-                        rotate(${angle}deg)
-                        translateY(clamp(-185px, -37vw, -125px))
-                        rotate(-${angle}deg)
-                      `,
+                      transform:
+                        "translate(-50%, -50%) " +
+                        "rotate(" +
+                        angle +
+                        "deg) " +
+                        "translateY(clamp(-185px, -37vw, -125px)) " +
+                        "rotate(-" +
+                        angle +
+                        "deg)",
                     }}
                   >
                     <div className="max-w-full rounded-lg bg-black/25 px-2 py-1.5 shadow-lg backdrop-blur-[2px]">
                       <p className="line-clamp-2 text-[9px] font-black uppercase leading-tight sm:text-[10px] md:text-xs">
-                        {segment.productName}
+                        {
+                          segment.productName
+                        }
                       </p>
 
                       <p className="mt-1 line-clamp-2 text-[8px] font-semibold leading-tight text-white/90 sm:text-[9px] md:text-[10px]">
