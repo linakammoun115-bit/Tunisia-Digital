@@ -1,7 +1,15 @@
 import { supabase } from "@/lib/supabase";
-export type DurationKey = "1 month" | "6 months" | "1 year";
 
-export type DurationPrice = Record<DurationKey, string>;
+export type DurationKey =
+  | "1 month"
+  | "6 months"
+  | "1 year";
+
+export type DurationPrice = Record<
+  DurationKey,
+  string
+;
+
 
 export type Subscription = {
   name: string;
@@ -14,283 +22,234 @@ export type Subscription = {
   pricesByDuration: DurationPrice;
 };
 
-const makePrices = (
-  oneMonth: string,
-  sixMonths: string,
-  oneYear: string
-): DurationPrice => ({
-  "1 month": oneMonth,
-  "6 months": sixMonths,
-  "1 year": oneYear,
-});
-
-export const defaultSubscriptions: Record<string, Subscription> = {
-  "canva-pro": {
-    name: "Canva Pro",
-    oldPrice: "25 DT",
-    duration: "1 year",
-    category: "Creative",
-    description:
-      "Create professional designs, posts, logos and presentations with Canva Pro.",
-    features: [
-      "1 year access",
-      "Premium templates",
-      "Fast activation",
-      "WhatsApp support",
-    ],
-    active: true,
-    pricesByDuration: makePrices("10 DT", "55 DT", "99 DT"),
-  },
-
-  "chatgpt-business": {
-    name: "ChatGPT Business",
-    oldPrice: "60 DT",
-    duration: "1 month",
-    category: "AI Tools",
-    description:
-      "Premium AI assistant access for work, study, productivity and business tasks.",
-    features: [
-      "AI premium access",
-      "Instant activation",
-      "Secure local payment",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("30 DT", "150 DT", "250 DT"),
-  },
-
-  "capcut-pro": {
-    name: "CapCut Pro",
-    oldPrice: "30 DT",
-    duration: "1 month",
-    category: "Creative",
-    description:
-      "Edit videos with premium CapCut tools, effects, templates and export options.",
-    features: [
-      "Premium editing tools",
-      "Fast activation",
-      "Perfect for creators",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("15 DT", "75 DT", "120 DT"),
-  },
-
-  "adobe-creative-cloud-pro": {
-    name: "Adobe Creative Cloud Pro",
-    oldPrice: "80 DT",
-    duration: "1 month",
-    category: "Creative",
-    description:
-      "Professional creative tools for design, editing, photography and content creation.",
-    features: [
-      "Creative apps access",
-      "Fast delivery",
-      "Secure payment",
-      "WhatsApp support",
-    ],
-    active: true,
-    pricesByDuration: makePrices("40 DT", "200 DT", "350 DT"),
-  },
-
-  "netflix-shared": {
-    name: "Netflix Shared",
-    oldPrice: "30 DT",
-    duration: "1 month",
-    category: "Streaming",
-    description:
-      "Affordable Netflix shared access with quick activation and local support.",
-    features: [
-      "Shared profile access",
-      "Fast delivery",
-      "1 month duration",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("15 DT", "75 DT", "120 DT"),
-  },
-
-  "netflix-private": {
-    name: "Netflix Private",
-    oldPrice: "70 DT",
-    duration: "1 month",
-    category: "Streaming",
-    description:
-      "Private Netflix access for a smoother and more personal streaming experience.",
-    features: [
-      "Private access",
-      "Instant activation",
-      "Secure payment",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("35 DT", "180 DT", "300 DT"),
-  },
-
-  "netflix-essential": {
-    name: "Netflix Essential",
-    oldPrice: "50 DT",
-    duration: "1 month",
-    category: "Streaming",
-    description:
-      "Essential Netflix access with reliable activation and friendly support.",
-    features: [
-      "Essential access",
-      "Fast activation",
-      "1 month duration",
-      "WhatsApp support",
-    ],
-    active: true,
-    pricesByDuration: makePrices("25 DT", "130 DT", "220 DT"),
-  },
-
-  "iptv-dream-4k": {
-    name: "IPTV Dream 4K",
-    oldPrice: "150 DT",
-    duration: "1 year",
-    category: "Streaming",
-    description:
-      "Enjoy IPTV Dream 4K for sports, movies, series and entertainment channels.",
-    features: ["4K streaming", "1 year access", "Fast setup", "Support included"],
-    active: true,
-    pricesByDuration: makePrices("15 DT", "50 DT", "90 DT"),
-  },
-
-  "youtube-premium": {
-    name: "YouTube Premium",
-    oldPrice: "40 DT",
-    duration: "1 month",
-    category: "Streaming",
-    description: "Watch YouTube without ads and enjoy premium features.",
-    features: [
-      "Ad-free YouTube",
-      "Background play",
-      "Fast activation",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("20 DT", "100 DT", "180 DT"),
-  },
-
-  "spotify-premium": {
-    name: "Spotify Premium",
-    oldPrice: "70 DT",
-    duration: "1 year",
-    category: "Streaming",
-    description: "Enjoy unlimited music with Spotify Premium for one year.",
-    features: [
-      "1 year access",
-      "Music premium",
-      "Fast activation",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("10 DT", "25 DT", "40 DT"),
-  },
-
-  "linkedin-career": {
-    name: "LinkedIn Career",
-    oldPrice: "90 DT",
-    duration: "1 month",
-    category: "Productivity",
-    description: "Boost your career with LinkedIn premium career tools.",
-    features: [
-      "Career insights",
-      "Learning features",
-      "Premium tools",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("20 DT", "50 DT", "90 DT"),
-  },
-
-  "linkedin-business": {
-    name: "LinkedIn Business",
-    oldPrice: "180 DT",
-    duration: "1 month",
-    category: "Productivity",
-    description:
-      "LinkedIn Business access for networking, prospecting and professional growth.",
-    features: [
-      "Business tools",
-      "Premium insights",
-      "Networking features",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("40 DT", "100 DT", "180 DT"),
-  },
-
-  "microsoft-office-professional-plus": {
-    name: "Microsoft Office Professional Plus",
-    oldPrice: "140 DT",
-    duration: "1 year",
-    category: "Productivity",
-    description:
-      "Professional Microsoft Office tools for documents, spreadsheets and presentations.",
-    features: [
-      "Office apps access",
-      "1 year duration",
-      "Fast activation",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("15 DT", "45 DT", "80 DT"),
-  },
-
-  "coursera-plus": {
-    name: "Coursera Plus",
-    oldPrice: "160 DT",
-    duration: "1 year",
-    category: "Education",
-    description:
-      "Learn new skills with Coursera Plus and access premium learning content.",
-    features: [
-      "1 year access",
-      "Premium courses",
-      "Learning certificates",
-      "Support included",
-    ],
-    active: true,
-    pricesByDuration: makePrices("20 DT", "60 DT", "90 DT"),
-  },
+type ProductRow = {
+  id: string;
+  name: string;
+  old_price: string;
+  duration: string;
+  category: string;
+  description: string;
+  features: unknown;
+  active: boolean;
+  price_1_month: string;
+  price_6_months: string;
+  price_1_year: string;
+  position: number;
 };
 
-function normalizeProduct(product: any): Subscription {
+function normalizeDuration(
+  duration: unknown
+): DurationKey {
+  if (
+    duration === "6 months" ||
+    duration === "1 year"
+  ) {
+    return duration;
+  }
+
+  return "1 month";
+}
+
+function normalizeFeatures(
+  features: unknown
+): string[] {
+  if (!Array.isArray(features)) {
+    return [];
+  }
+
+  return features.filter(
+    (feature): feature is string =>
+      typeof feature === "string"
+  );
+}
+
+function rowToSubscription(
+  row: ProductRow
+): Subscription {
   return {
-    ...product,
-    duration:
-      product.duration === "6 months" ||
-      product.duration === "1 year" ||
-      product.duration === "1 month"
-        ? product.duration
-        : "1 month",
+    name: row.name,
+    oldPrice: row.old_price || "0 DT",
+    duration: normalizeDuration(
+      row.duration
+    ),
+    category: row.category || "",
+    description:
+      row.description || "",
+    features: normalizeFeatures(
+      row.features
+    ),
+    active: row.active,
+
     pricesByDuration: {
-      "1 month": product.pricesByDuration?.["1 month"] || product.price || "0 DT",
-      "6 months": product.pricesByDuration?.["6 months"] || "0 DT",
-      "1 year": product.pricesByDuration?.["1 year"] || "0 DT",
+      "1 month":
+        row.price_1_month || "0 DT",
+      "6 months":
+        row.price_6_months || "0 DT",
+      "1 year":
+        row.price_1_year || "0 DT",
     },
   };
 }
 
-export function getProducts(): Record<string, Subscription> {
-  const saved = localStorage.getItem("products");
+function subscriptionToRow(
+  slug: string,
+  product: Subscription,
+  position = 0
+) {
+  return {
+    id: slug,
+    name: product.name,
+    old_price:
+      product.oldPrice || "0 DT",
+    duration: product.duration,
+    category: product.category || "",
+    description:
+      product.description || "",
+    features: product.features || [],
+    active: product.active,
+    price_1_month:
+      product.pricesByDuration[
+        "1 month"
+      ] || "0 DT",
+    price_6_months:
+      product.pricesByDuration[
+        "6 months"
+      ] || "0 DT",
+    price_1_year:
+      product.pricesByDuration[
+        "1 year"
+      ] || "0 DT",
+    position,
+    updated_at:
+      new Date().toISOString(),
+  };
+}
 
-  const source = saved
-    ? JSON.parse(saved)
-    : defaultSubscriptions;
+export async function getProducts(): Promise<
+  Record<string, Subscription>
+{
+
+  const { data, error } =
+    await supabase
+      .from("products")
+      .select("*")
+      .order("position", {
+        ascending: true,
+      });
+
+  if (error) {
+    console.error(
+      "Erreur chargement produits:",
+      error
+    );
+
+    throw new Error(
+      error.message ||
+        "Impossible de charger les produits."
+    );
+  }
+
+  const rows =
+    (data ?? []) as ProductRow[];
 
   return Object.fromEntries(
-    Object.entries(source).map(([slug, product]) => [
-      slug,
-      normalizeProduct(product),
+    rows.map((row) => [
+      row.id,
+      rowToSubscription(row),
     ])
   );
 }
 
-export function saveProducts(products: Record<string, Subscription>) {
-  localStorage.setItem("products", JSON.stringify(products));
-  window.dispatchEvent(new Event("products-updated"));
+export async function createProduct(
+  slug: string,
+  product: Subscription,
+  position = 0
+): Promise<void> {
+  const { error } = await supabase
+    .from("products")
+    .insert(
+      subscriptionToRow(
+        slug,
+        product,
+        position
+      )
+    );
+
+  if (error) {
+    console.error(
+      "Erreur ajout produit:",
+      error
+    );
+
+    throw new Error(error.message);
+  }
+}
+
+export async function updateProduct(
+  slug: string,
+  product: Subscription
+): Promise<void> {
+  const row = subscriptionToRow(
+    slug,
+    product
+  );
+
+  const { id, ...changes } = row;
+
+  const { error } = await supabase
+    .from("products")
+    .update(changes)
+    .eq("id", slug);
+
+  if (error) {
+    console.error(
+      "Erreur modification produit:",
+      error
+    );
+
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteProduct(
+  slug: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("products")
+    .delete()
+    .eq("id", slug);
+
+  if (error) {
+    console.error(
+      "Erreur suppression produit:",
+      error
+    );
+
+    throw new Error(error.message);
+  }
+}
+
+export function subscribeToProducts(
+  onChange: () => void
+) {
+  const channel = supabase
+    .channel("products-changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "products",
+      },
+      () => onChange()
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(
+      channel
+    );
+  };
 }
 
 /* COMMANDES EN ATTENTE */
@@ -306,31 +265,56 @@ export type PendingOrder = {
 };
 
 export function getPendingOrders(): PendingOrder[] {
-  const saved = localStorage.getItem("pendingOrders");
-  return saved ? JSON.parse(saved) : [];
+  const saved =
+    localStorage.getItem(
+      "pendingOrders"
+    );
+
+  return saved
+    ? JSON.parse(saved)
+    : [];
 }
 
-export function savePendingOrders(orders: PendingOrder[]) {
-  localStorage.setItem("pendingOrders", JSON.stringify(orders));
+export function savePendingOrders(
+  orders: PendingOrder[]
+) {
+  localStorage.setItem(
+    "pendingOrders",
+    JSON.stringify(orders)
+  );
 }
 
-export function savePendingCart(cart: any[]) {
-  if (!cart || cart.length === 0) return;
+export function savePendingCart(
+  cart: any[]
+) {
+  if (!cart || cart.length === 0) {
+    return;
+  }
 
   const total = cart.reduce(
-    (sum: number, item: any) => sum + item.price * item.quantity,
+    (
+      sum: number,
+      item: any
+    ) =>
+      sum +
+      item.price * item.quantity,
     0
   );
 
-  const pendingOrder: PendingOrder = {
-    id: "pending-cart",
-    clientName: "Client non confirmé",
-    phone: "Non renseigné",
-    status: "En attente",
-    items: cart,
-    total,
-    createdAt: new Date().toLocaleString(),
-  };
+  const pendingOrder: PendingOrder =
+    {
+      id: "pending-cart",
+      clientName:
+        "Client non confirmé",
+      phone: "Non renseigné",
+      status: "En attente",
+      items: cart,
+      total,
+      createdAt:
+        new Date().toLocaleString(),
+    };
 
-  savePendingOrders([pendingOrder]);
+  savePendingOrders([
+    pendingOrder,
+  ]);
 }
