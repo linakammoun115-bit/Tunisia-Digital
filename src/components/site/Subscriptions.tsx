@@ -206,7 +206,7 @@ function addSocialToCart(
       ? calculateRewardPrice(service.price, reward.percentage)
       : service.price;
 
-  const slug = social-${type}-${service.name}
+  const slug = 'social-${type}-${service.name}'
     .toLowerCase()
     .replace(/\s+/g, "-");
 
