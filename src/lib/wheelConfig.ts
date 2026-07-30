@@ -252,7 +252,7 @@ export async function getWheelPrizes(): Promise<WheelPrize[]> {
 }
 
 export async function getActiveWheelPrizes(): Promise<
-  WheelPrize[]
+  WheelPrize[]>
 {
 
   const prizes = await getWheelPrizes();
@@ -444,7 +444,7 @@ export async function replaceWheelPrizes(
 }
 
 export async function resetWheelPrizes(): Promise<
-  WheelPrize[]
+  WheelPrize[]>
 {
 
   const defaults = cloneDefaultPrizes();
