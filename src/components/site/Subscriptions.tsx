@@ -1,6 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { getProducts } from "@/lib/products";
-import { ArrowRight, Film, Flame, Gift, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState, type ElementType } from "react";
+import {
+  getProducts,
+  subscribeToProducts,
+  type Subscription,
+} from "@/lib/products";
+import {
+  ArrowRight,
+  Film,
+  Flame,
+  Gift,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "../ui/button";
 import { Link } from "@tanstack/react-router";
 
@@ -9,14 +19,14 @@ import {
   canUseRewardOnProduct,
   consumeWheelReward,
   getWheelReward,
-  WheelReward,
+  type WheelReward,
 } from "@/lib/wheelReward";
 
 type Plan = {
   name: string;
   slug: string;
   category: string;
-  icon: React.ElementType;
+  icon: ElementType;
   price: number;
   originalPrice: number;
   oldPrice: number;
@@ -32,22 +42,62 @@ type SocialService = {
 };
 
 const followersServices: SocialService[] = [
-  { name: "1K Followers", price: 10, desc: "Ideal for starting and giving your profile more credibility." },
-  { name: "2K Followers", price: 15, desc: "A stronger boost for personal pages and small businesses." },
-  { name: "10K Followers", price: 70, desc: "Perfect for influencers, creators and growing brands." },
-  { name: "20K Followers", price: 120, desc: "High-impact growth package for serious social presence." },
-  { name: "100K Followers", price: 500, desc: "Maximum visibility package for big pages and campaigns." },
+  {
+    name: "1K Followers",
+    price: 10,
+    desc: "Ideal for starting and giving your profile more credibility.",
+  },
+  {
+    name: "2K Followers",
+    price: 15,
+    desc: "A stronger boost for personal pages and small businesses.",
+  },
+  {
+    name: "10K Followers",
+    price: 70,
+    desc: "Perfect for influencers, creators and growing brands.",
+  },
+  {
+    name: "20K Followers",
+    price: 120,
+    desc: "High-impact growth package for serious social presence.",
+  },
+  {
+    name: "100K Followers",
+    price: 500,
+    desc: "Maximum visibility package for big pages and campaigns.",
+  },
 ];
 
 const viewsServices: SocialService[] = [
-  { name: "100K Views", price: 40, desc: "Boost your video reach and increase visibility quickly." },
-  { name: "1 Million Views", price: 120, desc: "Massive exposure package for viral content and campaigns." },
+  {
+    name: "100K Views",
+    price: 40,
+    desc: "Boost your video reach and increase visibility quickly.",
+  },
+  {
+    name: "1 Million Views",
+    price: 120,
+    desc: "Massive exposure package for viral content and campaigns.",
+  },
 ];
 
 const likesServices: SocialService[] = [
-  { name: "1K Likes", price: 20, desc: "Improve post engagement and make your content look active." },
-  { name: "10K Likes", price: 100, desc: "Great for campaigns, launches and high-performing posts." },
-  { name: "100K Likes", price: 300, desc: "Premium engagement package for large-scale visibility." },
+  {
+    name: "1K Likes",
+    price: 20,
+    desc: "Improve post engagement and make your content look active.",
+  },
+  {
+    name: "10K Likes",
+    price: 100,
+    desc: "Great for campaigns, launches and high-performing posts.",
+  },
+  {
+    name: "100K Likes",
+    price: 300,
+    desc: "Premium engagement package for large-scale visibility.",
+  },
 ];
 
 const baseCategories = [
@@ -59,19 +109,21 @@ const baseCategories = [
   "Education",
 ];
 
-function parsePrice(value: unknown) {
+function parsePrice(value: unknown): number {
   const normalized = String(value ?? "0")
     .replace(",", ".")
     .replace(/[^\d.]/g, "");
+
   const parsed = Number(normalized);
+
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatPrice(price: number) {
+function formatPrice(price: number): string {
   return Number.isInteger(price) ? String(price) : price.toFixed(2);
 }
 
-function normalizeText(value: string) {
+function normalizeText(value: string): string {
   return value
     .toLowerCase()
     .normalize("NFD")
@@ -83,18 +135,18 @@ function normalizeText(value: string) {
 function isRewardCompatible(
   reward: WheelReward | null,
   productName: string
-) {
-  if (!reward || reward.used) return false;
+): boolean {
+  if (!reward || reward.used) {
+    return false;
+  }
 
   const normalizedLabel = normalizeText(reward.label);
   const normalizedProduct = normalizeText(productName);
 
-  // Réduction générale
   if (normalizedLabel.includes("5% sur votre achat")) {
     return true;
   }
 
-  // Cas spécial : seulement 2K Followers
   if (normalizedLabel.includes("2k followers")) {
     const cleanProductName = normalizedProduct
       .replace(/\s*\(followers\)\s*$/, "")
@@ -103,7 +155,6 @@ function isRewardCompatible(
     return cleanProductName === "2k followers";
   }
 
-  // Autres récompenses ciblées
   if (normalizedLabel.includes("gemini")) {
     return normalizedProduct.includes("gemini");
   }
@@ -123,35 +174,51 @@ function isRewardCompatible(
   return canUseRewardOnProduct(reward, productName);
 }
 
+function getStoredCart(): any[] {
+  try {
+    const savedCart = localStorage.getItem("cart");
+
+    if (!savedCart) {
+      return [];
+    }
+
+    const parsed = JSON.parse(savedCart);
+
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function addSocialToCart(
   service: SocialService,
   type: string,
   reward: WheelReward | null,
   onRewardUsed: () => void
-) {
-  const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-  const productName = `${service.name} (${type})`;
+): void {
+  const cart = getStoredCart();
+  const productName = ${service.name} (${type});
 
-  const rewardCanBeUsed = isRewardCompatible(
-    reward,
-    productName
-  );
+  const rewardCanBeUsed = isRewardCompatible(reward, productName);
 
   const finalPrice =
     rewardCanBeUsed && reward
       ? calculateRewardPrice(service.price, reward.percentage)
       : service.price;
 
-  const slug = `social-${type}-${service.name}`
+  const slug = social-${type}-${service.name}
     .toLowerCase()
     .replace(/\s+/g, "-");
 
-  const existingItem = cart.find((item: any) => item.slug === slug);
+  const existingItem = cart.find((item) => item.slug === slug);
 
   const updatedCart = existingItem
-    ? cart.map((item: any) =>
+    ? cart.map((item) =>
         item.slug === slug
-          ? { ...item, quantity: item.quantity + 1 }
+          ? {
+              ...item,
+              quantity: Number(item.quantity ?? 0) + 1,
+            }
           : item
       )
     : [
@@ -183,9 +250,9 @@ function addSocialToCart(
 
   window.dispatchEvent(new Event("cart-updated"));
 
-  alert(
+  window.alert(
     rewardCanBeUsed && reward
-      ? `Produit ajouté avec l'offre : ${reward.label}`
+      ? Produit ajouté avec l'offre : ${reward.label}
       : "Added to cart ✅"
   );
 }
@@ -209,7 +276,8 @@ function SocialSection({
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {services.map((service) => {
-          const productName = `${service.name} (${title})`;
+          const productName = ${service.name} (${title});
+
           const rewardCanBeUsed = isRewardCompatible(
             wheelReward,
             productName
@@ -244,6 +312,7 @@ function SocialSection({
                 </div>
 
                 <h4 className="text-xl font-bold">{service.name}</h4>
+
                 <p className="mt-3 min-h-[48px] text-sm leading-relaxed text-muted-foreground">
                   {service.desc}
                 </p>
@@ -270,7 +339,12 @@ function SocialSection({
                   type="button"
                   className="mt-6 w-full rounded-xl py-2 gradient-primary text-white"
                   onClick={() =>
-                    addSocialToCart(service, title, wheelReward, onRewardUsed)
+                    addSocialToCart(
+                      service,
+                      title,
+                      wheelReward,
+                      onRewardUsed
+                    )
                   }
                 >
                   Add to Cart
@@ -287,32 +361,71 @@ function SocialSection({
 export function Subscriptions() {
   const [category, setCategory] = useState("All");
   const [sortBy, setSortBy] = useState("recommended");
-  const [adminProducts, setAdminProducts] = useState<Record<string, any>>(() => getProducts());
+
+  const [adminProducts, setAdminProducts] = useState<
+    Record<string, Subscription>
+  >({});
+
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState("");
+
   const [wheelReward, setWheelReward] = useState<WheelReward | null>(() => {
     const reward = getWheelReward();
+
     return reward && !reward.used ? reward : null;
   });
 
   const refreshReward = () => {
     const reward = getWheelReward();
+
     setWheelReward(reward && !reward.used ? reward : null);
   };
 
-  const categories = useMemo(
-    () => [
-      ...new Set([
-        ...baseCategories,
-        ...Object.values(adminProducts)
-          .map((product) => product.category)
-          .filter(Boolean),
-      ]),
-    ],
-    [adminProducts]
-  );
+  useEffect(() => {
+    let mounted = true;
+
+    const refreshProducts = async () => {
+      try {
+        if (mounted) {
+          setProductsError("");
+        }
+
+        const loadedProducts = await getProducts();
+
+        if (mounted) {
+          setAdminProducts(loadedProducts);
+        }
+      } catch (error) {
+        console.error("Erreur chargement produits:", error);
+
+        if (mounted) {
+          setProductsError(
+            "Impossible de charger les produits. Vérifie Supabase et ta connexion."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setProductsLoading(false);
+        }
+      }
+    };
+
+    void refreshProducts();
+
+    const unsubscribe = subscribeToProducts(() => {
+      void refreshProducts();
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const handleCategorySelected = () => {
       const selected = localStorage.getItem("selectedCategory");
+
       if (selected) {
         setCategory(selected);
         setSortBy("recommended");
@@ -320,34 +433,58 @@ export function Subscriptions() {
     };
 
     handleCategorySelected();
-    window.addEventListener("category-selected", handleCategorySelected);
-    return () => window.removeEventListener("category-selected", handleCategorySelected);
-  }, []);
 
-  useEffect(() => {
-    const refreshProducts = () => setAdminProducts(getProducts());
-    refreshProducts();
-    window.addEventListener("products-updated", refreshProducts);
-    return () => window.removeEventListener("products-updated", refreshProducts);
+    window.addEventListener(
+      "category-selected",
+      handleCategorySelected
+    );
+
+    return () => {
+      window.removeEventListener(
+        "category-selected",
+        handleCategorySelected
+      );
+    };
   }, []);
 
   useEffect(() => {
     refreshReward();
+
     window.addEventListener("wheel-reward-updated", refreshReward);
     window.addEventListener("storage", refreshReward);
 
     return () => {
-      window.removeEventListener("wheel-reward-updated", refreshReward);
+      window.removeEventListener(
+        "wheel-reward-updated",
+        refreshReward
+      );
+
       window.removeEventListener("storage", refreshReward);
     };
   }, []);
 
+  const categories = useMemo(() => {
+    const productCategories = Object.values(adminProducts)
+      .map((product) => product.category)
+      .filter(
+        (productCategory): productCategory is string =>
+          typeof productCategory === "string" &&
+          productCategory.trim().length > 0
+      );
+
+    return [...new Set([...baseCategories, ...productCategories])];
+  }, [adminProducts]);
+
   const filteredPlans = useMemo<Plan[]>(() => {
     const result = Object.entries(adminProducts)
-      .filter(([_, product]) => product.active)
+      .filter(([, product]) => product.active)
       .map(([slug, product]) => {
-        const originalPrice = parsePrice(product.pricesByDuration?.["1 month"]);
+        const originalPrice = parsePrice(
+          product.pricesByDuration?.["1 month"]
+        );
+
         const oldPrice = parsePrice(product.oldPrice);
+
         const rewardCanBeUsed = isRewardCompatible(
           wheelReward,
           product.name
@@ -368,29 +505,44 @@ export function Subscriptions() {
             : originalPrice,
           originalPrice,
           oldPrice,
-          duration: "1 month",
+          duration: product.duration || "1 month",
           accent: "from-primary to-accent",
           rewardDiscount,
         };
       })
-      .filter((plan) => category === "All" || plan.category === category);
+      .filter(
+        (plan) => category === "All" || plan.category === category
+      );
 
     return [...result].sort((a, b) => {
-      if (sortBy === "price-low") return a.price - b.price;
-      if (sortBy === "price-high") return b.price - a.price;
+      if (sortBy === "price-low") {
+        return a.price - b.price;
+      }
+
+      if (sortBy === "price-high") {
+        return b.price - a.price;
+      }
 
       if (sortBy === "discount") {
-        const discountA = a.oldPrice > 0 ? 1 - a.price / a.oldPrice : 0;
-        const discountB = b.oldPrice > 0 ? 1 - b.price / b.oldPrice : 0;
+        const discountA =
+          a.oldPrice > 0 ? 1 - a.price / a.oldPrice : 0;
+
+        const discountB =
+          b.oldPrice > 0 ? 1 - b.price / b.oldPrice : 0;
+
         return discountB - discountA;
       }
 
-      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "name") {
+        return a.name.localeCompare(b.name);
+      }
+
       return 0;
     });
   }, [adminProducts, category, sortBy, wheelReward]);
 
-  const hasActiveFilters = category !== "All" || sortBy !== "recommended";
+  const hasActiveFilters =
+    category !== "All" || sortBy !== "recommended";
 
   const resetFilters = () => {
     localStorage.removeItem("selectedCategory");
@@ -399,15 +551,20 @@ export function Subscriptions() {
   };
 
   return (
-    <section id="subscriptions" className="relative overflow-hidden py-24">
+    <section
+      id="subscriptions"
+      className="relative overflow-hidden py-24"
+    >
       <div className="container relative z-10 mx-auto px-6">
         <div className="mx-auto mb-12 max-w-2xl text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-primary glass">
-            <Flame className="h-3.5 w-3.5" /> HOT OFFERS
+            <Flame className="h-3.5 w-3.5" />
+            HOT OFFERS
           </div>
 
           <h2 className="mb-4 font-display text-4xl font-bold md:text-5xl">
-            Featured <span className="gradient-text">Subscriptions</span>
+            Featured{" "}
+            <span className="gradient-text">Subscriptions</span>
           </h2>
 
           <p className="text-muted-foreground">
@@ -425,14 +582,19 @@ export function Subscriptions() {
               <div className="flex-1">
                 <div className="mb-1 flex flex-wrap items-center justify-center gap-2 md:justify-start">
                   <Sparkles className="h-4 w-4 text-primary" />
+
                   <span className="text-xs font-bold uppercase tracking-wider text-primary">
                     Ton cadeau du mois
                   </span>
                 </div>
 
-                <h3 className="text-2xl font-bold gradient-text">{wheelReward.label}</h3>
+                <h3 className="text-2xl font-bold gradient-text">
+                  {wheelReward.label}
+                </h3>
+
                 <p className="mt-1 text-sm text-muted-foreground">
-                  L'offre sera appliquée une seule fois au premier produit compatible ajouté au panier.
+                  L'offre sera appliquée une seule fois au premier produit
+                  compatible ajouté au panier.
                 </p>
               </div>
             </div>
@@ -494,6 +656,30 @@ export function Subscriptions() {
           )}
         </div>
 
+        {productsLoading && (
+          <div className="mx-auto mb-8 max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center text-muted-foreground">
+            Chargement des produits...
+          </div>
+        )}
+
+        {productsError && (
+          <div className="mx-auto mb-8 max-w-2xl rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-center text-sm text-destructive">
+            {productsError}
+          </div>
+        )}
+
+        {!productsLoading &&
+          !productsError &&
+          filteredPlans.length === 0 && (
+            <div className="mx-auto mb-8 max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center">
+              <p className="font-semibold">Aucun produit disponible</p>
+
+              <p className="mt-2 text-sm text-muted-foreground">
+                Aucun produit actif ne correspond à cette catégorie.
+              </p>
+            </div>
+          )}
+
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {filteredPlans.map((plan) => {
             const Icon = plan.icon;
@@ -510,7 +696,9 @@ export function Subscriptions() {
 
                 <div className="relative z-10">
                   <div className="mb-5 flex items-start justify-between gap-3">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${plan.accent} shadow-lg`}>
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${plan.accent} shadow-lg`}
+                    >
                       <Icon className="h-6 w-6 text-primary-foreground" />
                     </div>
 
@@ -545,7 +733,10 @@ export function Subscriptions() {
                         <span className="text-3xl font-bold gradient-text">
                           {formatPrice(plan.price)}
                         </span>
-                        <span className="mb-1 text-xl font-bold gradient-text">DT</span>
+
+                        <span className="mb-1 text-xl font-bold gradient-text">
+                          DT
+                        </span>
                       </div>
 
                       {plan.rewardDiscount > 0 && (
@@ -556,9 +747,16 @@ export function Subscriptions() {
                     </div>
                   </div>
 
-                  <Button asChild className="w-full border-0 gradient-primary text-primary-foreground">
-                    <Link to="/subscription/$slug" params={{ slug: plan.slug }}>
-                      Voir détails <ArrowRight className="ml-2 h-4 w-4" />
+                  <Button
+                    asChild
+                    className="w-full border-0 gradient-primary text-primary-foreground"
+                  >
+                    <Link
+                      to="/subscription/$slug"
+                      params={{ slug: plan.slug }}
+                    >
+                      Voir détails
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                 </div>
@@ -574,7 +772,8 @@ export function Subscriptions() {
             </div>
 
             <h2 className="mb-4 font-display text-4xl font-bold md:text-5xl">
-              Boost Your <span className="gradient-text">Social Media</span>
+              Boost Your{" "}
+              <span className="gradient-text">Social Media</span>
             </h2>
 
             <p className="text-muted-foreground">
@@ -588,12 +787,14 @@ export function Subscriptions() {
             wheelReward={wheelReward}
             onRewardUsed={refreshReward}
           />
+
           <SocialSection
             title="Views"
             services={viewsServices}
             wheelReward={wheelReward}
             onRewardUsed={refreshReward}
           />
+
           <SocialSection
             title="Likes"
             services={likesServices}
