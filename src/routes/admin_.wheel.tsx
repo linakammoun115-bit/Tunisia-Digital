@@ -315,7 +315,7 @@ function AdminWheelPage() {
   ) {
     const confirmed =
       window.confirm(
-        Supprimer "${prize.name}" ?
+       'Supprimer "${prize.name}" ?'
       );
 
     if (!confirmed) {
