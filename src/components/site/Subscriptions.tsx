@@ -197,7 +197,7 @@ function addSocialToCart(
   onRewardUsed: () => void
 ): void {
   const cart = getStoredCart();
-  const productName = ${service.name} (${type});
+  const productName = '${service.name} (${type})';
 
   const rewardCanBeUsed = isRewardCompatible(reward, productName);
 
