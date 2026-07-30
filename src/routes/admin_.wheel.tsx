@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type FormEvent,
 } from "react";
 
 import {
@@ -32,7 +33,7 @@ import {
   type WheelPrize,
 } from "@/lib/wheelConfig";
 
-export const Route = createFileRoute("/admin/wheel")({
+export const Route = createFileRoute("/admin_/wheel")({
   component: AdminWheelPage,
 });
 
@@ -138,7 +139,7 @@ function AdminWheelPage() {
   }
 
   function handleSubmit(
-    event: React.FormEvent
+    event: FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
 
@@ -170,9 +171,21 @@ function AdminWheelPage() {
       return;
     }
 
-    if (
+    const editedPrize =
+      editingId
+        ? prizes.find(
+            (prize) =>
+              prize.id === editingId
+          )
+        : undefined;
+
+    const activatingNewPrize =
       form.active &&
-      !editingId &&
+      (!editedPrize ||
+        !editedPrize.active);
+
+    if (
+      activatingNewPrize &&
       activeCount >= MAX_ACTIVE_PRIZES
     ) {
       showMessage(
@@ -188,7 +201,9 @@ function AdminWheelPage() {
       productName:
         form.productName.trim() ||
         undefined,
-      color: form.color,
+      color:
+        form.color.trim() ||
+        DEFAULT_COLORS[0],
       active: form.active,
     };
 
@@ -248,11 +263,12 @@ function AdminWheelPage() {
     }
 
     deleteWheelPrize(prize.id);
-    loadPrizes();
 
     if (editingId === prize.id) {
       resetForm();
     }
+
+    loadPrizes();
 
     showMessage(
       "Récompense supprimée."
@@ -303,14 +319,13 @@ function AdminWheelPage() {
 
     const updated = [...prizes];
 
-    const currentPrize =
-      updated[index];
-
-    updated[index] =
-      updated[targetIndex];
-
-    updated[targetIndex] =
-      currentPrize;
+    [
+      updated[index],
+      updated[targetIndex],
+    ] = [
+      updated[targetIndex],
+      updated[index],
+    ];
 
     setPrizes(updated);
     saveWheelPrizes(updated);
@@ -319,7 +334,7 @@ function AdminWheelPage() {
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6 md:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link
               to="/admin"
@@ -348,7 +363,7 @@ function AdminWheelPage() {
             <Save className="mr-2 h-4 w-4" />
             Enregistrer
           </Button>
-        </div>
+        </header>
 
         {message && (
           <div className="mb-6 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
@@ -455,7 +470,7 @@ function AdminWheelPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Choisissez le produit, le
                 texte, le pourcentage et la
-                couleur de la partie.
+                couleur de chaque partie.
               </p>
             </div>
 
@@ -582,6 +597,39 @@ function AdminWheelPage() {
               </div>
             </label>
 
+            <div className="md:col-span-2">
+              <p className="mb-3 text-sm font-semibold">
+                Couleurs rapides
+              </p>
+
+              <div className="flex flex-wrap gap-3">
+                {DEFAULT_COLORS.map(
+                  (color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      aria-label={`Choisir ${color}`}
+                      onClick={() =>
+                        updateForm(
+                          "color",
+                          color
+                        )
+                      }
+                      className={`h-10 w-10 rounded-full border-4 transition hover:scale-110 ${
+                        form.color === color
+                          ? "border-primary"
+                          : "border-white/20"
+                      }`}
+                      style={{
+                        backgroundColor:
+                          color,
+                      }}
+                    />
+                  )
+                )}
+              </div>
+            </div>
+
             <label className="flex cursor-pointer items-center gap-3 rounded-xl border bg-background p-4 md:col-span-2">
               <input
                 type="checkbox"
@@ -607,7 +655,7 @@ function AdminWheelPage() {
               </div>
             </label>
 
-            <div className="flex gap-3 md:col-span-2">
+            <div className="flex flex-wrap gap-3 md:col-span-2">
               <Button
                 type="submit"
                 className="gradient-primary border-0"
@@ -645,16 +693,15 @@ function AdminWheelPage() {
             </h2>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              Les 8 premières récompenses
-              actives seront utilisées dans
-              la roue.
+              Les 8 récompenses actives
+              seront affichées dans la roue
+              selon cet ordre.
             </p>
           </div>
 
           {prizes.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
               <Gift className="mx-auto mb-4 h-10 w-10" />
-
               Aucune récompense configurée.
             </div>
           ) : (
@@ -698,7 +745,7 @@ function AdminWheelPage() {
 
                       <div className="mt-3 flex flex-wrap gap-4 text-sm">
                         <span>
-                          Produit :{" "}
+                          Produit:{" "}
                           <strong>
                             {prize.productName ||
                               "Tous les produits"}
@@ -706,7 +753,7 @@ function AdminWheelPage() {
                         </span>
 
                         <span>
-                          Réduction :{" "}
+                          Pourcentage:{" "}
                           <strong>
                             {prize.percentage} %
                           </strong>
