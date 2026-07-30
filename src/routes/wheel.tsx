@@ -16,6 +16,7 @@ import {
   Lock,
   Sparkles,
   Trophy,
+  TriangleAlert,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export const Route = createFileRoute("/wheel")({
 });
 
 const SPIN_DURATION = 5000;
+const REQUIRED_PRIZES_COUNT = 8;
 
 function WheelGame() {
   const [prizes, setPrizes] =
@@ -54,13 +56,59 @@ function WheelGame() {
   const [alreadySpun, setAlreadySpun] =
     useState(false);
 
+  /*
+    Le nombre de sections dépend
+    des récompenses actives.
+
+    La configuration valide doit
+    contenir exactement 8 récompenses.
+  */
   const slice =
     prizes.length > 0
       ? 360 / prizes.length
-      : 360;
+      : 360 / REQUIRED_PRIZES_COUNT;
+
+  /*
+    Calcul automatique du total.
+
+    Les valeurs viennent de la page Admin.
+    Aucun pourcentage n'est écrit ici.
+  */
+  const totalPercentage = useMemo(() => {
+    return prizes.reduce(
+      (total, prize) => {
+        return (
+          total +
+          (Number(prize.percentage) || 0)
+        );
+      },
+      0
+    );
+  }, [prizes]);
+
+  const hasEightPrizes =
+    prizes.length ===
+    REQUIRED_PRIZES_COUNT;
+
+  /*
+    On utilise une petite tolérance
+    pour éviter les problèmes comme
+    99.999999 à cause des décimales.
+  */
+  const hasValidPercentageTotal =
+    Math.abs(totalPercentage - 100) <
+    0.001;
+
+  const isConfigurationValid =
+    hasEightPrizes &&
+    hasValidPercentageTotal;
 
   useEffect(() => {
     const loadPrizes = () => {
+      /*
+        Les récompenses viennent
+        directement de la configuration Admin.
+      */
       const activePrizes =
         getActiveWheelPrizes();
 
@@ -86,8 +134,21 @@ function WheelGame() {
       }
     }
 
+    /*
+      Actualisation automatique après
+      une modification depuis l'Admin.
+    */
     window.addEventListener(
       "wheel-config-updated",
+      loadPrizes
+    );
+
+    /*
+      Permet aussi de détecter les
+      modifications dans un autre onglet.
+    */
+    window.addEventListener(
+      "storage",
       loadPrizes
     );
 
@@ -96,9 +157,18 @@ function WheelGame() {
         "wheel-config-updated",
         loadPrizes
       );
+
+      window.removeEventListener(
+        "storage",
+        loadPrizes
+      );
     };
   }, []);
 
+  /*
+    Création dynamique des couleurs
+    de la roue depuis les données Admin.
+  */
   const wheelBackground =
     useMemo(() => {
       if (prizes.length === 0) {
@@ -116,7 +186,10 @@ function WheelGame() {
           const end =
             start + currentSlice;
 
-          return `${prize.color} ${start}deg ${end}deg`;
+          const color =
+            prize.color || "#7c3aed";
+
+          return `${color} ${start}deg ${end}deg`;
         }
       );
 
@@ -129,7 +202,7 @@ function WheelGame() {
     if (
       spinning ||
       alreadySpun ||
-      prizes.length === 0
+      !isConfigurationValid
     ) {
       return;
     }
@@ -137,6 +210,16 @@ function WheelGame() {
     setSpinning(true);
     setResult("");
 
+    /*
+      Une chance égale pour chaque case.
+
+      Avec 8 cases :
+      chaque récompense a 12,5 %
+      de probabilité de sortir.
+
+      prize.percentage représente
+      la remise gagnée.
+  */
     const winningIndex =
       Math.floor(
         Math.random() * prizes.length
@@ -145,13 +228,21 @@ function WheelGame() {
     const winningPrize =
       prizes[winningIndex];
 
+    if (!winningPrize) {
+      setSpinning(false);
+      return;
+    }
+
     const targetCenterAngle =
       winningIndex * slice +
       slice / 2;
 
+    /*
+      Correction pour le pointeur
+      positionné en haut de la roue.
+    */
     const desiredRotation =
-      (360 - targetCenterAngle) %
-      360;
+      (360 - targetCenterAngle) % 360;
 
     const currentNormalized =
       ((rotation % 360) + 360) %
@@ -173,10 +264,6 @@ function WheelGame() {
       completeTurns * 360 +
       correction;
 
-    /*
-      On bloque immédiatement
-      la participation du mois.
-    */
     markSpinForCurrentMonth();
 
     setAlreadySpun(true);
@@ -188,7 +275,9 @@ function WheelGame() {
           id: winningPrize.id,
           label: winningPrize.label,
           percentage:
-            winningPrize.percentage,
+            Number(
+              winningPrize.percentage
+            ) || 0,
           productName:
             winningPrize.productName,
         });
@@ -212,12 +301,14 @@ function WheelGame() {
           className="mb-8 inline-flex items-center gap-2 rounded-full border border-border/70 px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/50 hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
+
           Retour accueil
         </Link>
 
         <div className="mb-10">
           <div className="glass mb-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-primary">
             <Sparkles className="h-4 w-4" />
+
             JEU CADEAU
           </div>
 
@@ -230,9 +321,10 @@ function WheelGame() {
 
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
             Tourne la roue et gagne une
-            réduction. Une seule
-            participation est autorisée par
-            mois.
+            réduction sur l’un de nos
+            produits. Une seule
+            participation est autorisée
+            par mois.
           </p>
         </div>
 
@@ -245,24 +337,93 @@ function WheelGame() {
             </h2>
 
             <p className="mt-3 text-sm text-muted-foreground">
-              L’administrateur doit activer
-              au moins une récompense dans
-              la gestion de la roue.
+              Ajoute et active les
+              récompenses depuis la page
+              Admin.
             </p>
+          </div>
+        ) : !isConfigurationValid ? (
+          <div className="mx-auto max-w-lg rounded-3xl border border-destructive/40 bg-destructive/10 p-8">
+            <TriangleAlert className="mx-auto mb-4 h-11 w-11 text-destructive" />
+
+            <h2 className="text-2xl font-bold text-destructive">
+              Configuration incorrecte
+            </h2>
+
+            <p className="mt-4 text-sm text-muted-foreground">
+              Corrige la configuration
+              depuis la page Admin avant
+              d’utiliser la roue.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border bg-background/50 p-4">
+                <p className="text-xs text-muted-foreground">
+                  Récompenses actives
+                </p>
+
+                <p
+                  className={`mt-1 text-xl font-bold ${
+                    hasEightPrizes
+                      ? "text-green-500"
+                      : "text-destructive"
+                  }`}
+                >
+                  {prizes.length} / 8
+                </p>
+              </div>
+
+              <div className="rounded-2xl border bg-background/50 p-4">
+                <p className="text-xs text-muted-foreground">
+                  Total des remises
+                </p>
+
+                <p
+                  className={`mt-1 text-xl font-bold ${
+                    hasValidPercentageTotal
+                      ? "text-green-500"
+                      : "text-destructive"
+                  }`}
+                >
+                  {totalPercentage} %
+                </p>
+              </div>
+            </div>
+
+            {!hasEightPrizes && (
+              <p className="mt-5 text-sm font-semibold text-destructive">
+                Il faut exactement huit
+                récompenses actives.
+              </p>
+            )}
+
+            {!hasValidPercentageTotal && (
+              <p className="mt-2 text-sm font-semibold text-destructive">
+                Le total des pourcentages
+                saisis dans l’Admin doit
+                être égal à 100 %.
+              </p>
+            )}
           </div>
         ) : (
           <>
             <div className="relative mx-auto mb-10 flex h-[330px] w-[330px] items-center justify-center sm:h-[380px] sm:w-[380px] md:h-[460px] md:w-[460px]">
+              {/* Pointeur */}
+
               <div className="absolute -top-3 z-40 flex flex-col items-center">
                 <div className="h-7 w-7 rounded-full border-4 border-background bg-primary shadow-xl" />
 
                 <div className="-mt-1 h-0 w-0 border-l-[22px] border-r-[22px] border-t-[44px] border-l-transparent border-r-transparent border-t-primary drop-shadow-lg" />
               </div>
 
+              {/* Lumière */}
+
               <div className="absolute h-full w-full rounded-full bg-primary/20 blur-2xl" />
 
+              {/* Roue */}
+
               <div
-                className="relative h-full w-full rounded-full border-[10px] border-primary shadow-2xl"
+                className="relative h-full w-full overflow-hidden rounded-full border-[10px] border-primary shadow-2xl"
                 style={{
                   transform: `rotate(${rotation}deg)`,
 
@@ -278,6 +439,8 @@ function WheelGame() {
 
                 <div className="absolute inset-12 rounded-full border border-white/10" />
 
+                {/* Séparations */}
+
                 {prizes.map(
                   (_, index) => {
                     const lineAngle =
@@ -286,7 +449,7 @@ function WheelGame() {
                     return (
                       <div
                         key={`line-${index}`}
-                        className="absolute left-1/2 top-1/2 h-1/2 w-[2px] origin-bottom bg-white/30"
+                        className="absolute left-1/2 top-1/2 h-1/2 w-[2px] origin-bottom bg-white/40"
                         style={{
                           transform: `
                             translateX(-50%)
@@ -299,6 +462,8 @@ function WheelGame() {
                   }
                 )}
 
+                {/* Récompenses */}
+
                 {prizes.map(
                   (prize, index) => {
                     const angle =
@@ -308,7 +473,7 @@ function WheelGame() {
                     return (
                       <div
                         key={prize.id}
-                        className="absolute left-1/2 top-1/2 flex w-28 items-center justify-center text-center text-[10px] font-black leading-tight text-white drop-shadow-xl sm:w-32 sm:text-xs"
+                        className="absolute left-1/2 top-1/2 flex w-24 items-center justify-center text-center text-[9px] font-black leading-tight text-white drop-shadow-xl sm:w-28 sm:text-[11px] md:w-32 md:text-xs"
                         style={{
                           transform: `
                             rotate(${angle}deg)
@@ -320,14 +485,16 @@ function WheelGame() {
                             "center center",
 
                           marginLeft:
-                            "-64px",
+                            "-56px",
 
                           marginTop:
-                            "-18px",
+                            "-20px",
                         }}
                       >
-                        <span className="rounded-lg bg-black/20 px-2 py-1 backdrop-blur-sm">
-                          {prize.label}
+                        <span className="rounded-lg bg-black/25 px-2 py-1.5 backdrop-blur-sm">
+                          {prize.productName}
+                          <br />
+                          -{prize.percentage}%
                         </span>
                       </div>
                     );
@@ -335,13 +502,15 @@ function WheelGame() {
                 )}
               </div>
 
+              {/* Bouton central */}
+
               <button
                 type="button"
                 onClick={spinWheel}
                 disabled={
                   spinning ||
                   alreadySpun ||
-                  prizes.length === 0
+                  !isConfigurationValid
                 }
                 className="absolute z-30 flex h-24 w-24 items-center justify-center rounded-full border-4 border-primary bg-background shadow-xl transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-70 md:h-32 md:w-32"
               >
@@ -370,7 +539,7 @@ function WheelGame() {
               disabled={
                 spinning ||
                 alreadySpun ||
-                prizes.length === 0
+                !isConfigurationValid
               }
               className="gradient-primary glow-primary h-12 border-0 px-10 text-primary-foreground"
             >
