@@ -251,29 +251,28 @@ function AdminWheelPage() {
   }
 
   function handleDelete(
-    prize: WheelPrize
-  ) {
-    const confirmed =
-     window.confirm(
-  Supprimer "${prize.name}" ?
-);
+  prize: WheelPrize
+) {
+  const confirmed = window.confirm(
+    'Supprimer "' + prize.name + '" ?'
+  );
 
-    if (!confirmed) {
-      return;
-    }
-
-    deleteWheelPrize(prize.id);
-
-    if (editingId === prize.id) {
-      resetForm();
-    }
-
-    loadPrizes();
-
-    showMessage(
-      "Récompense supprimée."
-    );
+  if (!confirmed) {
+    return;
   }
+
+  deleteWheelPrize(prize.id);
+
+  if (editingId === prize.id) {
+    resetForm();
+  }
+
+  loadPrizes();
+
+  showMessage(
+    "Récompense supprimée."
+  );
+}
 
   function handleToggleActive(
     prize: WheelPrize
