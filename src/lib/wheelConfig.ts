@@ -218,9 +218,7 @@ export function isWheelConfigurationValid(
   );
 }
 
-export async function getWheelPrizes(): Promise<
-  WheelPrize[]
-{
+export async function getWheelPrizes(): Promise<WheelPrize[]> {
 
   const { data, error } = await supabase
     .from("wheel_prizes")
