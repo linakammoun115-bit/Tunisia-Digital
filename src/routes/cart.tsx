@@ -1289,3 +1289,4 @@ function CartPage() {
       </div>
     </main>
   );
+}
