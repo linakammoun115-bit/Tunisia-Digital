@@ -109,8 +109,10 @@ function createId() {
   return ${Date.now()}-${Math.random().toString(36).slice(2)};
 }
 
-function cloneDefaultPrizes() {
-  return DEFAULT_WHEEL_PRIZES.map((prize) => ({ ...prize }));
+function cloneDefaultPrizes(): WheelPrize[] {
+  return DEFAULT_WHEEL_PRIZES.map((prize) => ({
+    ...prize,
+  }));
 }
 
 function normalizePrize(
@@ -125,7 +127,7 @@ function normalizePrize(
   return {
     id:
       typeof prize.id === "string" && prize.id.trim()
-        ? prize.id
+        ? prize.id.trim()
         : createId(),
 
     name:
@@ -153,7 +155,9 @@ function normalizePrize(
         : fallback.color,
 
     active:
-      typeof prize.active === "boolean" ? prize.active : true,
+      typeof prize.active === "boolean"
+        ? prize.active
+        : true,
   };
 }
 
@@ -169,7 +173,10 @@ function rowToPrize(row: WheelPrizeRow): WheelPrize {
   };
 }
 
-function prizeToRow(prize: WheelPrize, position: number): WheelPrizeRow {
+function prizeToRow(
+  prize: WheelPrize,
+  position: number
+): WheelPrizeRow {
   return {
     id: prize.id,
     name: prize.name,
@@ -182,11 +189,26 @@ function prizeToRow(prize: WheelPrize, position: number): WheelPrizeRow {
   };
 }
 
-export function isWheelConfigurationValid(prizes: WheelPrize[]) {
-  const activePrizes = prizes.filter((prize) => prize.active);
+function dispatchWheelUpdate() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new Event("wheel-config-updated")
+  );
+}
+
+export function isWheelConfigurationValid(
+  prizes: WheelPrize[]
+) {
+  const activePrizes = prizes.filter(
+    (prize) => prize.active
+  );
 
   const totalPercentage = activePrizes.reduce(
-    (total, prize) => total + Number(prize.percentage || 0),
+    (total, prize) =>
+      total + Number(prize.percentage || 0),
     0
   );
 
@@ -196,27 +218,45 @@ export function isWheelConfigurationValid(prizes: WheelPrize[]) {
   );
 }
 
-export async function getWheelPrizes(): Promise<WheelPrize[]> {
+export async function getWheelPrizes(): Promise<
+  WheelPrize[]
+{
+
   const { data, error } = await supabase
     .from("wheel_prizes")
-    .select("*")
-    .order("position", { ascending: true });
+    .select(
+      "id, name, label, percentage, product_name, color, active, position"
+    )
+    .order("position", {
+      ascending: true,
+    });
 
   if (error) {
-    console.error("Erreur lecture wheel_prizes:", error);
-    throw new Error("Impossible de charger les récompenses.");
+    console.error(
+      "Erreur lecture wheel_prizes:",
+      error
+    );
+
+    throw new Error(
+      "Impossible de charger les récompenses."
+    );
   }
 
   if (!data || data.length === 0) {
     const defaults = cloneDefaultPrizes();
+
     await saveWheelPrizes(defaults);
+
     return defaults;
   }
 
   return (data as WheelPrizeRow[]).map(rowToPrize);
 }
 
-export async function getActiveWheelPrizes(): Promise<WheelPrize[]> {
+export async function getActiveWheelPrizes(): Promise<
+  WheelPrize[]
+{
+
   const prizes = await getWheelPrizes();
 
   return prizes
@@ -229,32 +269,40 @@ export async function getWheelPrizeById(
 ): Promise<WheelPrize | null> {
   const { data, error } = await supabase
     .from("wheel_prizes")
-    .select("*")
+    .select(
+      "id, name, label, percentage, product_name, color, active, position"
+    )
     .eq("id", id)
     .maybeSingle();
 
   if (error) {
-    console.error("Erreur lecture récompense:", error);
-    throw new Error("Impossible de charger la récompense.");
+    console.error(
+      "Erreur lecture récompense:",
+      error
+    );
+
+    throw new Error(
+      "Impossible de charger la récompense."
+    );
   }
 
-  return data ? rowToPrize(data as WheelPrizeRow) : null;
+  return data
+    ? rowToPrize(data as WheelPrizeRow)
+    : null;
 }
 
 export async function saveWheelPrizes(
   prizes: WheelPrize[]
 ): Promise<WheelPrize[]> {
-  const normalizedPrizes = prizes.map((prize, index) =>
-    normalizePrize(prize, index)
+  const normalizedPrizes = prizes.map(
+    (prize, index) =>
+      normalizePrize(prize, index)
   );
 
-  if (!isWheelConfigurationValid(normalizedPrizes)) {
-    throw new Error(
-      "La roue doit contenir exactement 8 récompenses actives avec un total de 100 %."
-    );
-  }
-
-  const rows = normalizedPrizes.map(prizeToRow);
+  const rows = normalizedPrizes.map(
+    (prize, position) =>
+      prizeToRow(prize, position)
+  );
 
   const { error: upsertError } = await supabase
     .from("wheel_prizes")
@@ -263,24 +311,39 @@ export async function saveWheelPrizes(
     });
 
   if (upsertError) {
-    console.error("Erreur sauvegarde wheel_prizes:", upsertError);
-    throw new Error("Impossible de sauvegarder les récompenses.");
+    console.error(
+      "Erreur sauvegarde wheel_prizes:",
+      upsertError
+    );
+
+    throw new Error(
+      "Impossible de sauvegarder les récompenses."
+    );
   }
 
-  const prizeIds = normalizedPrizes.map((prize) => prize.id);
+  const currentIds = normalizedPrizes.map(
+    (prize) => prize.id
+  );
 
-  const { data: existingRows, error: selectError } = await supabase
-    .from("wheel_prizes")
-    .select("id");
+  const { data: existingRows, error: selectError } =
+    await supabase
+      .from("wheel_prizes")
+      .select("id");
 
   if (selectError) {
-    console.error("Erreur vérification wheel_prizes:", selectError);
-    throw new Error("Impossible de vérifier les récompenses.");
+    console.error(
+      "Erreur vérification wheel_prizes:",
+      selectError
+    );
+
+    throw new Error(
+      "Les récompenses ont été enregistrées, mais la vérification a échoué."
+    );
   }
 
   const removedIds = (existingRows ?? [])
-    .map((row) => row.id as string)
-    .filter((id) => !prizeIds.includes(id));
+    .map((row) => String(row.id))
+    .filter((id) => !currentIds.includes(id));
 
   if (removedIds.length > 0) {
     const { error: deleteError } = await supabase
@@ -289,12 +352,18 @@ export async function saveWheelPrizes(
       .in("id", removedIds);
 
     if (deleteError) {
-      console.error("Erreur suppression anciennes récompenses:", deleteError);
-      throw new Error("Impossible de supprimer les anciennes récompenses.");
+      console.error(
+        "Erreur suppression anciennes récompenses:",
+        deleteError
+      );
+
+      throw new Error(
+        "Impossible de supprimer les anciennes récompenses."
+      );
     }
   }
 
-  window.dispatchEvent(new Event("wheel-config-updated"));
+  dispatchWheelUpdate();
 
   return normalizedPrizes;
 }
@@ -312,7 +381,10 @@ export async function addWheelPrize(
     prizes.length
   );
 
-  await saveWheelPrizes([...prizes, newPrize]);
+  await saveWheelPrizes([
+    ...prizes,
+    newPrize,
+  ]);
 
   return newPrize;
 }
@@ -323,24 +395,34 @@ export async function updateWheelPrize(
 ): Promise<WheelPrize | null> {
   const prizes = await getWheelPrizes();
 
-  const updatedPrizes = prizes.map((prize, index) => {
-    if (prize.id !== id) {
-      return prize;
-    }
+  let updatedPrize: WheelPrize | null = null;
 
-    return normalizePrize(
-      {
-        ...prize,
-        ...updates,
-        id: prize.id,
-      },
-      index
-    );
-  });
+  const updatedPrizes = prizes.map(
+    (prize, index) => {
+      if (prize.id !== id) {
+        return prize;
+      }
+
+      updatedPrize = normalizePrize(
+        {
+          ...prize,
+          ...updates,
+          id: prize.id,
+        },
+        index
+      );
+
+      return updatedPrize;
+    }
+  );
+
+  if (!updatedPrize) {
+    return null;
+  }
 
   await saveWheelPrizes(updatedPrizes);
 
-  return updatedPrizes.find((prize) => prize.id === id) ?? null;
+  return updatedPrize;
 }
 
 export async function deleteWheelPrize(
@@ -348,7 +430,9 @@ export async function deleteWheelPrize(
 ): Promise<WheelPrize[]> {
   const prizes = await getWheelPrizes();
 
-  const updatedPrizes = prizes.filter((prize) => prize.id !== id);
+  const updatedPrizes = prizes.filter(
+    (prize) => prize.id !== id
+  );
 
   await saveWheelPrizes(updatedPrizes);
 
@@ -361,7 +445,10 @@ export async function replaceWheelPrizes(
   return saveWheelPrizes(prizes);
 }
 
-export async function resetWheelPrizes(): Promise<WheelPrize[]> {
+export async function resetWheelPrizes(): Promise<
+  WheelPrize[]
+{
+
   const defaults = cloneDefaultPrizes();
 
   await saveWheelPrizes(defaults);
@@ -369,7 +456,9 @@ export async function resetWheelPrizes(): Promise<WheelPrize[]> {
   return defaults;
 }
 
-export function subscribeToWheelPrizes(callback: () => void) {
+export function subscribeToWheelPrizes(
+  callback: () => void
+) {
   const channel = supabase
     .channel("wheel-prizes-changes")
     .on(
@@ -381,10 +470,23 @@ export function subscribeToWheelPrizes(callback: () => void) {
       },
       () => {
         callback();
-        window.dispatchEvent(new Event("wheel-config-updated"));
+        dispatchWheelUpdate();
       }
     )
-    .subscribe();
+    .subscribe((status, error) => {
+      if (error) {
+        console.error(
+          "Erreur abonnement wheel_prizes:",
+          error
+        );
+      }
+
+      if (status === "CHANNEL_ERROR") {
+        console.error(
+          "Le canal Realtime wheel_prizes a échoué."
+        );
+      }
+    });
 
   return () => {
     void supabase.removeChannel(channel);
