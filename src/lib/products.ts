@@ -24,17 +24,18 @@ export type Subscription = {
 
 type ProductRow = {
   id: string;
-  name: string;
-  old_price: string;
-  duration: string;
-  category: string;
-  description: string;
+  name: string | null;
+  old_price: string | number | null;
+  duration: string | null;
+  category: string | null;
+  description: string | null;
   features: unknown;
-  active: boolean;
-  price_1_month: string;
-  price_6_months: string;
-  price_1_year: string;
-  position: number;
+  active: boolean | null;
+  price_1_month: string | number | null;
+  price_6_months: string | number | null;
+  price_1_year: string | number | null;
+  position: number | null;
+  updated_at?: string | null;
 };
 
 function normalizeDuration(
@@ -53,77 +54,126 @@ function normalizeDuration(
 function normalizeFeatures(
   features: unknown
 ): string[] {
-  if (!Array.isArray(features)) {
-    return [];
+  if (Array.isArray(features)) {
+    return features.filter(
+      (feature): feature is string =>
+        typeof feature === "string"
+    );
   }
 
-  return features.filter(
-    (feature): feature is string =>
-      typeof feature === "string"
-  );
+  return [];
+}
+
+function normalizePrice(
+  price: string | number | null | undefined
+): string {
+  if (
+    price === null ||
+    price === undefined ||
+    price === ""
+  ) {
+    return "0 DT";
+  }
+
+  const value = String(price);
+
+  return value.includes("DT")
+    ? value
+    : ${value} DT;
 }
 
 function rowToSubscription(
   row: ProductRow
 ): Subscription {
   return {
-    name: row.name,
-    oldPrice: row.old_price || "0 DT",
+    name: row.name || "",
+
+    oldPrice: normalizePrice(
+      row.old_price
+    ),
+
     duration: normalizeDuration(
       row.duration
     ),
+
     category: row.category || "",
+
     description:
       row.description || "",
+
     features: normalizeFeatures(
       row.features
     ),
-    active: row.active,
+
+    active:
+      row.active ?? true,
 
     pricesByDuration: {
-      "1 month":
-        row.price_1_month || "0 DT",
-      "6 months":
-        row.price_6_months || "0 DT",
-      "1 year":
-        row.price_1_year || "0 DT",
+      "1 month": normalizePrice(
+        row.price_1_month
+      ),
+
+      "6 months": normalizePrice(
+        row.price_6_months
+      ),
+
+      "1 year": normalizePrice(
+        row.price_1_year
+      ),
     },
   };
 }
 
 function subscriptionToRow(
-  slug: string,
   product: Subscription,
   position = 0
 ) {
   return {
-    id: slug,
     name: product.name,
+
     old_price:
       product.oldPrice || "0 DT",
-    duration: product.duration,
-    category: product.category || "",
+
+    duration:
+      product.duration,
+
+    category:
+      product.category || "",
+
     description:
       product.description || "",
-    features: product.features || [],
-    active: product.active,
+
+    features:
+      product.features || [],
+
+    active:
+      product.active,
+
     price_1_month:
       product.pricesByDuration[
         "1 month"
       ] || "0 DT",
+
     price_6_months:
       product.pricesByDuration[
         "6 months"
       ] || "0 DT",
+
     price_1_year:
       product.pricesByDuration[
         "1 year"
       ] || "0 DT",
+
     position,
+
     updated_at:
       new Date().toISOString(),
   };
 }
+
+/* =========================
+   GET PRODUCTS
+========================= */
 
 export async function getProducts(): Promise<
   Record<string, Subscription>
@@ -160,20 +210,100 @@ export async function getProducts(): Promise<
   );
 }
 
+/* =========================
+   GET ACTIVE PRODUCTS
+========================= */
+
+export async function getActiveProducts(): Promise<
+  Record<string, Subscription>
+{
+
+  const { data, error } =
+    await supabase
+      .from("products")
+      .select("*")
+      .eq("active", true)
+      .order("position", {
+        ascending: true,
+      });
+
+  if (error) {
+    console.error(
+      "Erreur chargement produits actifs:",
+      error
+    );
+
+    throw new Error(
+      error.message ||
+        "Impossible de charger les produits actifs."
+    );
+  }
+
+  const rows =
+    (data ?? []) as ProductRow[];
+
+  return Object.fromEntries(
+    rows.map((row) => [
+      row.id,
+      rowToSubscription(row),
+    ])
+  );
+}
+
+/* =========================
+   GET ONE PRODUCT
+========================= */
+
+export async function getProduct(
+  id: string
+): Promise<Subscription | null> {
+  const { data, error } =
+    await supabase
+      .from("products")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+  if (error) {
+    console.error(
+      "Erreur chargement produit:",
+      error
+    );
+
+    throw new Error(
+      error.message
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return rowToSubscription(
+    data as ProductRow
+  );
+}
+
+/* =========================
+   CREATE PRODUCT
+========================= */
+
 export async function createProduct(
-  slug: string,
   product: Subscription,
   position = 0
-): Promise<void> {
-  const { error } = await supabase
-    .from("products")
-    .insert(
-      subscriptionToRow(
-        slug,
-        product,
-        position
-      )
+): Promise<string> {
+  const row =
+    subscriptionToRow(
+      product,
+      position
     );
+
+  const { data, error } =
+    await supabase
+      .from("products")
+      .insert(row)
+      .select("id")
+      .single();
 
   if (error) {
     console.error(
@@ -181,25 +311,34 @@ export async function createProduct(
       error
     );
 
-    throw new Error(error.message);
+    throw new Error(
+      error.message
+    );
   }
+
+  return data.id;
 }
 
+/* =========================
+   UPDATE PRODUCT
+========================= */
+
 export async function updateProduct(
-  slug: string,
-  product: Subscription
+  id: string,
+  product: Subscription,
+  position?: number
 ): Promise<void> {
-  const row = subscriptionToRow(
-    slug,
-    product
-  );
+  const row =
+    subscriptionToRow(
+      product,
+      position ?? 0
+    );
 
-  const { id, ...changes } = row;
-
-  const { error } = await supabase
-    .from("products")
-    .update(changes)
-    .eq("id", slug);
+  const { error } =
+    await supabase
+      .from("products")
+      .update(row)
+      .eq("id", id);
 
   if (error) {
     console.error(
@@ -207,17 +346,24 @@ export async function updateProduct(
       error
     );
 
-    throw new Error(error.message);
+    throw new Error(
+      error.message
+    );
   }
 }
 
+/* =========================
+   DELETE PRODUCT
+========================= */
+
 export async function deleteProduct(
-  slug: string
+  id: string
 ): Promise<void> {
-  const { error } = await supabase
-    .from("products")
-    .delete()
-    .eq("id", slug);
+  const { error } =
+    await supabase
+      .from("products")
+      .delete()
+      .eq("id", id);
 
   if (error) {
     console.error(
@@ -225,25 +371,96 @@ export async function deleteProduct(
       error
     );
 
-    throw new Error(error.message);
+    throw new Error(
+      error.message
+    );
   }
 }
+
+/* =========================
+   ACTIVATE / DEACTIVATE
+========================= */
+
+export async function setProductActive(
+  id: string,
+  active: boolean
+): Promise<void> {
+  const { error } =
+    await supabase
+      .from("products")
+      .update({
+        active,
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", id);
+
+  if (error) {
+    console.error(
+      "Erreur changement statut produit:",
+      error
+    );
+
+    throw new Error(
+      error.message
+    );
+  }
+}
+
+/* =========================
+   UPDATE PRODUCT POSITION
+========================= */
+
+export async function updateProductPosition(
+  id: string,
+  position: number
+): Promise<void> {
+  const { error } =
+    await supabase
+      .from("products")
+      .update({
+        position,
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", id);
+
+  if (error) {
+    console.error(
+      "Erreur changement position:",
+      error
+    );
+
+    throw new Error(
+      error.message
+    );
+  }
+}
+
+/* =========================
+   REALTIME PRODUCTS
+========================= */
 
 export function subscribeToProducts(
   onChange: () => void
 ) {
-  const channel = supabase
-    .channel("products-changes")
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "products",
-      },
-      () => onChange()
-    )
-    .subscribe();
+  const channel =
+    supabase
+      .channel(
+        "products-realtime"
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "products",
+        },
+        () => {
+          onChange();
+        }
+      )
+      .subscribe();
 
   return () => {
     void supabase.removeChannel(
@@ -252,7 +469,9 @@ export function subscribeToProducts(
   };
 }
 
-/* COMMANDES EN ATTENTE */
+/* =========================
+   PENDING ORDERS
+========================= */
 
 export type PendingOrder = {
   id: string;
@@ -265,19 +484,32 @@ export type PendingOrder = {
 };
 
 export function getPendingOrders(): PendingOrder[] {
-  const saved =
-    localStorage.getItem(
-      "pendingOrders"
+  try {
+    const saved =
+      localStorage.getItem(
+        "pendingOrders"
+      );
+
+    if (!saved) {
+      return [];
+    }
+
+    return JSON.parse(
+      saved
+    ) as PendingOrder[];
+  } catch (error) {
+    console.error(
+      "Erreur lecture commandes:",
+      error
     );
 
-  return saved
-    ? JSON.parse(saved)
-    : [];
+    return [];
+  }
 }
 
 export function savePendingOrders(
   orders: PendingOrder[]
-) {
+): void {
   localStorage.setItem(
     "pendingOrders",
     JSON.stringify(orders)
@@ -286,33 +518,47 @@ export function savePendingOrders(
 
 export function savePendingCart(
   cart: any[]
-) {
-  if (!cart || cart.length === 0) {
+): void {
+  if (
+    !cart ||
+    cart.length === 0
+  ) {
     return;
   }
 
-  const total = cart.reduce(
-    (
-      sum: number,
-      item: any
-    ) =>
-      sum +
-      item.price * item.quantity,
-    0
-  );
+  const total =
+    cart.reduce(
+      (
+        sum: number,
+        item: any
+      ) =>
+        sum +
+        Number(item.price || 0) *
+          Number(
+            item.quantity || 1
+          ),
+      0
+    );
 
-  const pendingOrder: PendingOrder =
-    {
-      id: "pending-cart",
-      clientName:
-        "Client non confirmé",
-      phone: "Non renseigné",
-      status: "En attente",
-      items: cart,
-      total,
-      createdAt:
-        new Date().toLocaleString(),
-    };
+  const pendingOrder: PendingOrder = {
+    id: "pending-cart",
+
+    clientName:
+      "Client non confirmé",
+
+    phone:
+      "Non renseigné",
+
+    status:
+      "En attente",
+
+    items: cart,
+
+    total,
+
+    createdAt:
+      new Date().toLocaleString(),
+  };
 
   savePendingOrders([
     pendingOrder,
