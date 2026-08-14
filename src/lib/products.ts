@@ -76,10 +76,9 @@ function normalizePrice(
   }
 
   const value = String(price);
-
-  return value.includes("DT")
-    ? value
-    : ${value} DT;
+  if (value.includes("DT")){
+  return value}
+    return '${value} DT';
 }
 
 function rowToSubscription(
