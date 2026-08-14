@@ -252,7 +252,7 @@ function addSocialToCart(
 
   window.alert(
     rewardCanBeUsed && reward
-      ? Produit ajouté avec l'offre : ${reward.label}
+      ? 'Produit ajouté avec l'offre : ${reward.label}'
       : "Added to cart ✅"
   );
 }
