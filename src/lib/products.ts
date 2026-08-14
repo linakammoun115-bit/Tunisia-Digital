@@ -8,7 +8,7 @@ export type DurationKey =
 export type DurationPrice = Record<
   DurationKey,
   string
-;
+>;
 
 
 export type Subscription = {
