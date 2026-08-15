@@ -251,10 +251,10 @@ function addSocialToCart(
   window.dispatchEvent(new Event("cart-updated"));
 
   window.alert(
-    rewardCanBeUsed && reward
-      ? 'Produit ajouté avec l'offre : ${reward.label}'
-      : "Added to cart ✅"
-  );
+  rewardCanBeUsed && reward
+    ? `Produit ajouté avec l'offre : ${reward.label}`
+    : "Added to cart ✅"
+);
 }
 
 function SocialSection({
