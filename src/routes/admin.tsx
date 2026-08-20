@@ -16,7 +16,10 @@ import {
 
 import {
   getProducts,
-  saveProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct as deleteProductFromDb,
+  setProductActive,
   type Subscription,
 } from "@/lib/products";
 
@@ -36,19 +39,18 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-function slugify(text: string) {
-  return text
-    .toLowerCase()
-    .trim()
-    .replaceAll(" ", "-");
-}
-
 function AdminPage() {
   const navigate = useNavigate();
 
   const [products, setProducts] = useState<
     Record<string, Subscription>
-  >(getProducts);
+  >({});
+
+  const [productsLoading, setProductsLoading] =
+    useState(true);
+
+  const [productsError, setProductsError] =
+    useState("");
 
   const [
     paymentMethods,
@@ -104,6 +106,44 @@ function AdminPage() {
   ] = useState("");
 
   useEffect(() => {
+    let mounted = true;
+
+    const loadProducts = async () => {
+      try {
+        setProductsLoading(true);
+        setProductsError("");
+
+        const data = await getProducts();
+
+        if (mounted) {
+          setProducts(data);
+        }
+      } catch (error) {
+        console.error(
+          "Erreur chargement produits Supabase:",
+          error
+        );
+
+        if (mounted) {
+          setProductsError(
+            "Impossible de charger les produits."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setProductsLoading(false);
+        }
+      }
+    };
+
+    void loadProducts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const isAdmin =
       localStorage.getItem(
         "adminAuth"
@@ -116,93 +156,126 @@ function AdminPage() {
     }
   }, [navigate]);
 
-  const updateAllProducts = (
-    updated: Record<
-      string,
-      Subscription
-    >
-  ) => {
-    setProducts(updated);
-    saveProducts(updated);
-  };
-
-  const addProduct = () => {
+  const addProduct = async () => {
     if (!newName.trim()) {
       window.alert(
         "Écris le nom du produit."
       );
-
       return;
     }
 
-    const slug = slugify(newName);
+    const duplicate = Object.values(
+      products
+    ).some(
+      (product) =>
+        product.name.trim().toLowerCase() ===
+        newName.trim().toLowerCase()
+    );
 
-    if (products[slug]) {
+    if (duplicate) {
       window.alert(
         "Ce produit existe déjà."
       );
-
       return;
     }
 
-    const updated: Record<
-      string,
-      Subscription
-    > = {
-      ...products,
-
-      [slug]: {
-        name: newName.trim(),
-        oldPrice: "0 DT",
-        duration: "1 month",
-        category: "New",
-        description: "",
-        features: [],
-        active: true,
-
-        pricesByDuration: {
-          "1 month": "0 DT",
-          "6 months": "0 DT",
-          "1 year": "0 DT",
-        },
+    const newProduct: Subscription = {
+      name: newName.trim(),
+      oldPrice: "0 DT",
+      duration: "1 month",
+      category: "New",
+      description: "",
+      features: [],
+      active: true,
+      pricesByDuration: {
+        "1 month": "0 DT",
+        "6 months": "0 DT",
+        "1 year": "0 DT",
       },
     };
 
-    updateAllProducts(updated);
-    setNewName("");
+    try {
+      const id = await createProduct(
+        newProduct,
+        Object.keys(products).length
+      );
+
+      setProducts((previous) => ({
+        ...previous,
+        [id]: newProduct,
+      }));
+
+      setNewName("");
+
+      window.alert(
+        "Produit ajouté avec succès."
+      );
+    } catch (error) {
+      console.error(
+        "Erreur ajout produit Supabase:",
+        error
+      );
+
+      window.alert(
+        "Impossible d'ajouter le produit."
+      );
+    }
   };
 
-  const toggleVisible = (
-    slug: string
+  const toggleVisible = async (
+    id: string
   ) => {
-    const updated = {
-      ...products,
+    const product = products[id];
 
-      [slug]: {
-        ...products[slug],
-        active:
-          !products[slug].active,
-      },
-    };
+    if (!product) {
+      return;
+    }
 
-    updateAllProducts(updated);
+    const nextActive = !product.active;
+
+    try {
+      await setProductActive(
+        id,
+        nextActive
+      );
+
+      setProducts((previous) => ({
+        ...previous,
+        [id]: {
+          ...previous[id],
+          active: nextActive,
+        },
+      }));
+    } catch (error) {
+      console.error(
+        "Erreur visibilité produit Supabase:",
+        error
+      );
+
+      window.alert(
+        "Impossible de modifier la visibilité."
+      );
+    }
   };
 
   const openEdit = (
-    slug: string
+    id: string
   ) => {
-    setEditingSlug(slug);
+    const product = products[id];
+
+    if (!product) {
+      return;
+    }
+
+    setEditingSlug(id);
 
     setEditProduct({
-      ...products[slug],
-
+      ...product,
       pricesByDuration: {
-        ...products[slug]
-          .pricesByDuration,
+        ...product.pricesByDuration,
       },
-
       features: [
-        ...products[slug].features,
+        ...product.features,
       ],
     });
   };
@@ -212,7 +285,7 @@ function AdminPage() {
     setEditProduct(null);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (
       !editingSlug ||
       !editProduct
@@ -220,34 +293,71 @@ function AdminPage() {
       return;
     }
 
-    const updated = {
-      ...products,
-      [editingSlug]: editProduct,
-    };
-
-    updateAllProducts(updated);
-    closeEdit();
-  };
-
-  const deleteProduct = (
-    slug: string
-  ) => {
-    const confirmDelete =
-      window.confirm(
-        "Voulez-vous supprimer ce produit ?"
+    try {
+      await updateProduct(
+        editingSlug,
+        editProduct
       );
 
-    if (!confirmDelete) {
+      setProducts((previous) => ({
+        ...previous,
+        [editingSlug]: editProduct,
+      }));
+
+      closeEdit();
+
+      window.alert(
+        "Produit modifié avec succès."
+      );
+    } catch (error) {
+      console.error(
+        "Erreur modification produit Supabase:",
+        error
+      );
+
+      window.alert(
+        "Impossible de modifier le produit."
+      );
+    }
+  };
+
+  const deleteProduct = async (
+    id: string
+  ) => {
+    const confirmed = window.confirm(
+      "Voulez-vous supprimer ce produit ?"
+    );
+
+    if (!confirmed) {
       return;
     }
 
-    const updated = {
-      ...products,
-    };
+    try {
+      await deleteProductFromDb(id);
 
-    delete updated[slug];
+      setProducts((previous) => {
+        const updated = {
+          ...previous,
+        };
 
-    updateAllProducts(updated);
+        delete updated[id];
+
+        return updated;
+      });
+
+      window.alert(
+        "Produit supprimé avec succès."
+      );
+    } catch (error) {
+      console.error(
+        "Erreur suppression produit Supabase:",
+        error
+      );
+
+      window.alert(
+        "Impossible de supprimer le produit."
+      );
+    }
   };
 
   const updatePaymentMethods = (
@@ -1049,6 +1159,19 @@ function AdminPage() {
             </div>
           </section>
 
+          {productsLoading && (
+            <div className="mb-4 rounded-2xl border bg-card p-6 text-center text-muted-foreground">
+              Chargement des produits depuis Supabase...
+            </div>
+          )}
+
+          {productsError && (
+            <div className="mb-4 rounded-2xl border border-destructive/40 bg-destructive/10 p-6 text-center text-destructive">
+              {productsError}
+            </div>
+          )}
+
+          {!productsLoading && !productsError && (
           <div className="overflow-x-auto rounded-2xl border bg-card">
             <table className="min-w-[900px] w-full text-left text-sm">
               <thead className="bg-muted">
@@ -1167,6 +1290,7 @@ function AdminPage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
 
         {editingSlug &&
