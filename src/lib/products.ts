@@ -100,6 +100,33 @@ function normalizePrice(
   return `${value} DT`;
 }
 
+function priceToDatabase(
+  price:
+    | string
+    | number
+    | null
+    | undefined
+): number {
+  if (
+    price === null ||
+    price === undefined ||
+    price === ""
+  ) {
+    return 0;
+  }
+
+  const cleaned = String(price)
+    .replace(/DT/gi, "")
+    .replace(",", ".")
+    .trim();
+
+  const value = Number(cleaned);
+
+  return Number.isNaN(value)
+    ? 0
+    : value;
+}
+
 /* =========================================================
    SUPABASE ROW -> WEBSITE PRODUCT
 ========================================================= */
@@ -167,7 +194,7 @@ function subscriptionToRow(
       product.name.trim(),
 
     old_price:
-      normalizePrice(
+      priceToDatabase(
         product.oldPrice
       ),
 
@@ -191,7 +218,7 @@ function subscriptionToRow(
       product.active,
 
     price_1_month:
-      normalizePrice(
+      priceToDatabase(
         product
           .pricesByDuration?.[
           "1 month"
@@ -199,7 +226,7 @@ function subscriptionToRow(
       ),
 
     price_6_months:
-      normalizePrice(
+      priceToDatabase(
         product
           .pricesByDuration?.[
           "6 months"
@@ -207,7 +234,7 @@ function subscriptionToRow(
       ),
 
     price_1_year:
-      normalizePrice(
+      priceToDatabase(
         product
           .pricesByDuration?.[
           "1 year"
