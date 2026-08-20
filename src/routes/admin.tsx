@@ -246,16 +246,21 @@ function AdminPage() {
           active: nextActive,
         },
       }));
-    } catch (error) {
-      console.error(
-        "Erreur visibilité produit Supabase:",
-        error
-      );
+   } catch (error) {
+  console.error(
+    "Erreur ajout produit Supabase:",
+    error
+  );
 
-      window.alert(
-        "Impossible de modifier la visibilité."
-      );
-    }
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error);
+
+  window.alert(
+    `Impossible d'ajouter le produit.\n\nErreur Supabase : ${message}`
+  );
+}
   };
 
   const openEdit = (
