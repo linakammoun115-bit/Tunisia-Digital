@@ -210,16 +210,21 @@ function AdminPage() {
       window.alert(
         "Produit ajouté avec succès."
       );
-    } catch (error) {
-      console.error(
-        "Erreur ajout produit Supabase:",
-        error
-      );
+   } catch (error) {
+  console.error(
+    "Erreur ajout produit Supabase:",
+    error
+  );
 
-      window.alert(
-        "Impossible d'ajouter le produit."
-      );
-    }
+  const message =
+    error instanceof Error
+      ? error.message
+      : JSON.stringify(error);
+
+  window.alert(
+    `Impossible d'ajouter le produit.\n\nErreur Supabase : ${message}`
+  );
+}
   };
 
   const toggleVisible = async (
