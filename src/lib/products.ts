@@ -215,7 +215,7 @@ export async function getProducts(): Promise<
 
 export async function getActiveProducts(): Promise<
   Record<string, Subscription>
-{
+>{
 
   const { data, error } =
     await supabase
