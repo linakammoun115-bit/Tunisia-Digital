@@ -276,7 +276,7 @@ function SocialSection({
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {services.map((service) => {
-          const productName = ${service.name} (${title});
+          const productName = `${service.name} (${title})`;
 
           const rewardCanBeUsed = isRewardCompatible(
             wheelReward,
