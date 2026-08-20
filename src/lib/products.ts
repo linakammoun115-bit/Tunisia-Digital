@@ -1,5 +1,9 @@
 import { supabase } from "@/lib/supabase";
 
+/* =========================================================
+   TYPES
+========================================================= */
+
 export type DurationKey =
   | "1 month"
   | "6 months"
@@ -9,7 +13,6 @@ export type DurationPrice = Record<
   DurationKey,
   string
 >;
-
 
 export type Subscription = {
   name: string;
@@ -38,14 +41,19 @@ type ProductRow = {
   updated_at?: string | null;
 };
 
+/* =========================================================
+   HELPERS
+========================================================= */
+
 function normalizeDuration(
   duration: unknown
 ): DurationKey {
-  if (
-    duration === "6 months" ||
-    duration === "1 year"
-  ) {
-    return duration;
+  if (duration === "6 months") {
+    return "6 months";
+  }
+
+  if (duration === "1 year") {
+    return "1 year";
   }
 
   return "1 month";
@@ -54,18 +62,22 @@ function normalizeDuration(
 function normalizeFeatures(
   features: unknown
 ): string[] {
-  if (Array.isArray(features)) {
-    return features.filter(
-      (feature): feature is string =>
-        typeof feature === "string"
-    );
+  if (!Array.isArray(features)) {
+    return [];
   }
 
-  return [];
+  return features.filter(
+    (feature): feature is string =>
+      typeof feature === "string"
+  );
 }
 
 function normalizePrice(
-  price: string | number | null | undefined
+  price:
+    | string
+    | number
+    | null
+    | undefined
 ): string {
   if (
     price === null ||
@@ -75,93 +87,132 @@ function normalizePrice(
     return "0 DT";
   }
 
-  const value = String(price);
-  if (value.includes("DT")){
-  return value}
-    return '${value} DT';
+  const value = String(price).trim();
+
+  if (
+    value
+      .toUpperCase()
+      .includes("DT")
+  ) {
+    return value;
+  }
+
+  return `${value} DT`;
 }
+
+/* =========================================================
+   SUPABASE ROW -> WEBSITE PRODUCT
+========================================================= */
 
 function rowToSubscription(
   row: ProductRow
 ): Subscription {
   return {
-    name: row.name || "",
+    name:
+      row.name || "",
 
-    oldPrice: normalizePrice(
-      row.old_price
-    ),
+    oldPrice:
+      normalizePrice(
+        row.old_price
+      ),
 
-    duration: normalizeDuration(
-      row.duration
-    ),
+    duration:
+      normalizeDuration(
+        row.duration
+      ),
 
-    category: row.category || "",
+    category:
+      row.category || "",
 
     description:
       row.description || "",
 
-    features: normalizeFeatures(
-      row.features
-    ),
+    features:
+      normalizeFeatures(
+        row.features
+      ),
 
     active:
       row.active ?? true,
 
     pricesByDuration: {
-      "1 month": normalizePrice(
-        row.price_1_month
-      ),
+      "1 month":
+        normalizePrice(
+          row.price_1_month
+        ),
 
-      "6 months": normalizePrice(
-        row.price_6_months
-      ),
+      "6 months":
+        normalizePrice(
+          row.price_6_months
+        ),
 
-      "1 year": normalizePrice(
-        row.price_1_year
-      ),
+      "1 year":
+        normalizePrice(
+          row.price_1_year
+        ),
     },
   };
 }
+
+/* =========================================================
+   WEBSITE PRODUCT -> SUPABASE ROW
+========================================================= */
 
 function subscriptionToRow(
   product: Subscription,
   position = 0
 ) {
   return {
-    name: product.name,
+    name:
+      product.name.trim(),
 
     old_price:
-      product.oldPrice || "0 DT",
+      normalizePrice(
+        product.oldPrice
+      ),
 
     duration:
       product.duration,
 
     category:
-      product.category || "",
+      product.category.trim(),
 
     description:
-      product.description || "",
+      product.description.trim(),
 
     features:
-      product.features || [],
+      Array.isArray(
+        product.features
+      )
+        ? product.features
+        : [],
 
     active:
       product.active,
 
     price_1_month:
-      product.pricesByDuration[
-        "1 month"
-      ] || "0 DT",
+      normalizePrice(
+        product
+          .pricesByDuration?.[
+          "1 month"
+        ]
+      ),
 
     price_6_months:
-      product.pricesByDuration[
-        "6 months"
-      ] || "0 DT",
+      normalizePrice(
+        product
+          .pricesByDuration?.[
+          "6 months"
+        ]
+      ),
 
     price_1_year:
-      product.pricesByDuration[
-        "1 year"
-      ] || "0 DT",
+      normalizePrice(
+        product
+          .pricesByDuration?.[
+          "1 year"
+        ]
+      ),
 
     position,
 
@@ -170,102 +221,147 @@ function subscriptionToRow(
   };
 }
 
-/* =========================
-   GET PRODUCTS
-========================= */
+/* =========================================================
+   GET ALL PRODUCTS
+========================================================= */
 
 export async function getProducts(): Promise<
-  Record<string, Subscription>
->{
-
-  const { data, error } =
+  Record<
+    string,
+    Subscription
+  >
+> {
+  const {
+    data,
+    error,
+  } =
     await supabase
       .from("products")
       .select("*")
-      .order("position", {
-        ascending: true,
-      });
+      .order(
+        "position",
+        {
+          ascending: true,
+        }
+      );
 
   if (error) {
     console.error(
-      "Erreur chargement produits:",
+      "Erreur Supabase getProducts:",
       error
     );
 
     throw new Error(
-      error.message ||
-        "Impossible de charger les produits."
+      error.message
     );
   }
 
   const rows =
-    (data ?? []) as ProductRow[];
+    (data ??
+      []) as ProductRow[];
 
-  return Object.fromEntries(
-    rows.map((row) => [
-      row.id,
-      rowToSubscription(row),
-    ])
-  );
+  const products: Record<
+    string,
+    Subscription
+  > = {};
+
+  for (
+    const row of rows
+  ) {
+    products[row.id] =
+      rowToSubscription(
+        row
+      );
+  }
+
+  return products;
 }
 
-/* =========================
+/* =========================================================
    GET ACTIVE PRODUCTS
-========================= */
+========================================================= */
 
 export async function getActiveProducts(): Promise<
-  Record<string, Subscription>
->{
-
-  const { data, error } =
+  Record<
+    string,
+    Subscription
+  >
+> {
+  const {
+    data,
+    error,
+  } =
     await supabase
       .from("products")
       .select("*")
-      .eq("active", true)
-      .order("position", {
-        ascending: true,
-      });
+      .eq(
+        "active",
+        true
+      )
+      .order(
+        "position",
+        {
+          ascending: true,
+        }
+      );
 
   if (error) {
     console.error(
-      "Erreur chargement produits actifs:",
+      "Erreur Supabase getActiveProducts:",
       error
     );
 
     throw new Error(
-      error.message ||
-        "Impossible de charger les produits actifs."
+      error.message
     );
   }
 
   const rows =
-    (data ?? []) as ProductRow[];
+    (data ??
+      []) as ProductRow[];
 
-  return Object.fromEntries(
-    rows.map((row) => [
-      row.id,
-      rowToSubscription(row),
-    ])
-  );
+  const products: Record<
+    string,
+    Subscription
+  > = {};
+
+  for (
+    const row of rows
+  ) {
+    products[row.id] =
+      rowToSubscription(
+        row
+      );
+  }
+
+  return products;
 }
 
-/* =========================
+/* =========================================================
    GET ONE PRODUCT
-========================= */
+========================================================= */
 
 export async function getProduct(
   id: string
-): Promise<Subscription | null> {
-  const { data, error } =
+): Promise<
+  Subscription | null
+> {
+  const {
+    data,
+    error,
+  } =
     await supabase
       .from("products")
       .select("*")
-      .eq("id", id)
+      .eq(
+        "id",
+        id
+      )
       .maybeSingle();
 
   if (error) {
     console.error(
-      "Erreur chargement produit:",
+      "Erreur Supabase getProduct:",
       error
     );
 
@@ -283,9 +379,9 @@ export async function getProduct(
   );
 }
 
-/* =========================
+/* =========================================================
    CREATE PRODUCT
-========================= */
+========================================================= */
 
 export async function createProduct(
   product: Subscription,
@@ -297,7 +393,10 @@ export async function createProduct(
       position
     );
 
-  const { data, error } =
+  const {
+    data,
+    error,
+  } =
     await supabase
       .from("products")
       .insert(row)
@@ -306,7 +405,7 @@ export async function createProduct(
 
   if (error) {
     console.error(
-      "Erreur ajout produit:",
+      "Erreur Supabase createProduct:",
       error
     );
 
@@ -315,33 +414,79 @@ export async function createProduct(
     );
   }
 
-  return data.id;
+  return String(
+    data.id
+  );
 }
 
-/* =========================
+/* =========================================================
    UPDATE PRODUCT
-========================= */
+========================================================= */
 
 export async function updateProduct(
   id: string,
   product: Subscription,
   position?: number
 ): Promise<void> {
+  let finalPosition =
+    position;
+
+  /*
+    Si on ne reçoit pas de position,
+    on garde la position actuelle.
+  */
+
+  if (
+    finalPosition ===
+    undefined
+  ) {
+    const {
+      data,
+      error,
+    } =
+      await supabase
+        .from("products")
+        .select(
+          "position"
+        )
+        .eq(
+          "id",
+          id
+        )
+        .maybeSingle();
+
+    if (error) {
+      console.error(
+        "Erreur récupération position:",
+        error
+      );
+    }
+
+    finalPosition =
+      data?.position ??
+      0;
+  }
+
   const row =
     subscriptionToRow(
       product,
-      position ?? 0
+      finalPosition
     );
 
-  const { error } =
+  const {
+    error,
+  } =
     await supabase
       .from("products")
       .update(row)
-      .eq("id", id);
+      .eq(
+        "id",
+        id
+      );
 
   if (error) {
     console.error(
-      "Erreur modification produit:",
+      "Erreur Supabase updateProduct:",
       error
     );
 
@@ -351,22 +496,27 @@ export async function updateProduct(
   }
 }
 
-/* =========================
+/* =========================================================
    DELETE PRODUCT
-========================= */
+========================================================= */
 
 export async function deleteProduct(
   id: string
 ): Promise<void> {
-  const { error } =
+  const {
+    error,
+  } =
     await supabase
       .from("products")
       .delete()
-      .eq("id", id);
+      .eq(
+        "id",
+        id
+      );
 
   if (error) {
     console.error(
-      "Erreur suppression produit:",
+      "Erreur Supabase deleteProduct:",
       error
     );
 
@@ -376,27 +526,34 @@ export async function deleteProduct(
   }
 }
 
-/* =========================
-   ACTIVATE / DEACTIVATE
-========================= */
+/* =========================================================
+   ACTIVE / INACTIVE
+========================================================= */
 
 export async function setProductActive(
   id: string,
   active: boolean
 ): Promise<void> {
-  const { error } =
+  const {
+    error,
+  } =
     await supabase
       .from("products")
       .update({
         active,
+
         updated_at:
-          new Date().toISOString(),
+          new Date()
+            .toISOString(),
       })
-      .eq("id", id);
+      .eq(
+        "id",
+        id
+      );
 
   if (error) {
     console.error(
-      "Erreur changement statut produit:",
+      "Erreur Supabase setProductActive:",
       error
     );
 
@@ -406,27 +563,34 @@ export async function setProductActive(
   }
 }
 
-/* =========================
-   UPDATE PRODUCT POSITION
-========================= */
+/* =========================================================
+   UPDATE POSITION
+========================================================= */
 
 export async function updateProductPosition(
   id: string,
   position: number
 ): Promise<void> {
-  const { error } =
+  const {
+    error,
+  } =
     await supabase
       .from("products")
       .update({
         position,
+
         updated_at:
-          new Date().toISOString(),
+          new Date()
+            .toISOString(),
       })
-      .eq("id", id);
+      .eq(
+        "id",
+        id
+      );
 
   if (error) {
     console.error(
-      "Erreur changement position:",
+      "Erreur Supabase updateProductPosition:",
       error
     );
 
@@ -436,9 +600,239 @@ export async function updateProductPosition(
   }
 }
 
-/* =========================
-   REALTIME PRODUCTS
-========================= */
+/* =========================================================
+   SAVE ALL PRODUCTS
+   utilisé par admin.tsx
+========================================================= */
+
+export async function saveProducts(
+  products: Record<
+    string,
+    Subscription
+  >
+): Promise<void> {
+  /*
+    1. On récupère tous les produits
+    existants dans Supabase.
+  */
+
+  const {
+    data: currentRows,
+    error:
+      currentRowsError,
+  } =
+    await supabase
+      .from("products")
+      .select(
+        "id"
+      );
+
+  if (
+    currentRowsError
+  ) {
+    console.error(
+      "Erreur récupération produits avant sauvegarde:",
+      currentRowsError
+    );
+
+    throw new Error(
+      currentRowsError.message
+    );
+  }
+
+  const existingIds =
+    new Set<string>(
+      (
+        currentRows ??
+        []
+      ).map(
+        (row) =>
+          String(
+            row.id
+          )
+      )
+    );
+
+  const entries =
+    Object.entries(
+      products
+    );
+
+  /*
+    IDs Supabase toujours présents
+    dans l'état Admin.
+  */
+
+  const idsStillPresent =
+    new Set<string>();
+
+  for (
+    const [
+      id,
+    ] of entries
+  ) {
+    if (
+      existingIds.has(
+        id
+      )
+    ) {
+      idsStillPresent.add(
+        id
+      );
+    }
+  }
+
+  /*
+    2. Suppression des produits
+    supprimés depuis l'Admin.
+  */
+
+  const idsToDelete =
+    Array.from(
+      existingIds
+    ).filter(
+      (id) =>
+        !idsStillPresent.has(
+          id
+        )
+    );
+
+  if (
+    idsToDelete.length >
+    0
+  ) {
+    const {
+      error:
+        deleteError,
+    } =
+      await supabase
+        .from("products")
+        .delete()
+        .in(
+          "id",
+          idsToDelete
+        );
+
+    if (
+      deleteError
+    ) {
+      console.error(
+        "Erreur suppression produits Supabase:",
+        deleteError
+      );
+
+      throw new Error(
+        deleteError.message
+      );
+    }
+  }
+
+  /*
+    3. UPDATE des produits existants.
+    4. INSERT des nouveaux produits.
+  */
+
+  for (
+    let index = 0;
+    index <
+    entries.length;
+    index++
+  ) {
+    const [
+      id,
+      product,
+    ] =
+      entries[
+        index
+      ];
+
+    const row =
+      subscriptionToRow(
+        product,
+        index
+      );
+
+    /*
+      Produit déjà dans Supabase
+    */
+
+    if (
+      existingIds.has(
+        id
+      )
+    ) {
+      const {
+        error:
+          updateError,
+      } =
+        await supabase
+          .from(
+            "products"
+          )
+          .update(
+            row
+          )
+          .eq(
+            "id",
+            id
+          );
+
+      if (
+        updateError
+      ) {
+        console.error(
+          `Erreur update ${product.name}:`,
+          updateError
+        );
+
+        throw new Error(
+          updateError.message
+        );
+      }
+
+      continue;
+    }
+
+    /*
+      Nouveau produit.
+
+      Le id utilisé dans admin.tsx
+      peut être un slug temporaire.
+
+      On ne l'envoie donc PAS à Supabase.
+      Supabase génère son UUID.
+    */
+
+    const {
+      error:
+        insertError,
+    } =
+      await supabase
+        .from(
+          "products"
+        )
+        .insert(
+          row
+        );
+
+    if (
+      insertError
+    ) {
+      console.error(
+        `Erreur insertion ${product.name}:`,
+        insertError
+      );
+
+      throw new Error(
+        insertError.message
+      );
+    }
+  }
+}
+
+/* =========================================================
+   REALTIME
+========================================================= */
 
 export function subscribeToProducts(
   onChange: () => void
@@ -452,8 +846,12 @@ export function subscribeToProducts(
         "postgres_changes",
         {
           event: "*",
-          schema: "public",
-          table: "products",
+
+          schema:
+            "public",
+
+          table:
+            "products",
         },
         () => {
           onChange();
@@ -462,15 +860,20 @@ export function subscribeToProducts(
       .subscribe();
 
   return () => {
-    void supabase.removeChannel(
-      channel
-    );
+    void supabase
+      .removeChannel(
+        channel
+      );
   };
 }
 
-/* =========================
+/* =========================================================
    PENDING ORDERS
-========================= */
+
+   Cette partie reste localStorage
+   pour l'instant car elle n'utilise
+   pas la table products.
+========================================================= */
 
 export type PendingOrder = {
   id: string;
@@ -493,10 +896,23 @@ export function getPendingOrders(): PendingOrder[] {
       return [];
     }
 
-    return JSON.parse(
-      saved
-    ) as PendingOrder[];
-  } catch (error) {
+    const parsed =
+      JSON.parse(
+        saved
+      );
+
+    if (
+      !Array.isArray(
+        parsed
+      )
+    ) {
+      return [];
+    }
+
+    return parsed;
+  } catch (
+    error
+  ) {
     console.error(
       "Erreur lecture commandes:",
       error
@@ -511,7 +927,9 @@ export function savePendingOrders(
 ): void {
   localStorage.setItem(
     "pendingOrders",
-    JSON.stringify(orders)
+    JSON.stringify(
+      orders
+    )
   );
 }
 
@@ -519,7 +937,9 @@ export function savePendingCart(
   cart: any[]
 ): void {
   if (
-    !cart ||
+    !Array.isArray(
+      cart
+    ) ||
     cart.length === 0
   ) {
     return;
@@ -528,38 +948,75 @@ export function savePendingCart(
   const total =
     cart.reduce(
       (
-        sum: number,
-        item: any
-      ) =>
-        sum +
-        Number(item.price || 0) *
+        sum:
+          number,
+        item:
+          any
+      ) => {
+        const rawPrice =
+          String(
+            item.price ??
+              0
+          )
+            .replace(
+              /DT/gi,
+              ""
+            )
+            .replace(
+              ",",
+              "."
+            )
+            .trim();
+
+        const price =
           Number(
-            item.quantity || 1
-          ),
+            rawPrice
+          ) || 0;
+
+        const quantity =
+          Number(
+            item.quantity ??
+              1
+          ) || 1;
+
+        return (
+          sum +
+          price *
+            quantity
+        );
+      },
       0
     );
 
-  const pendingOrder: PendingOrder = {
-    id: "pending-cart",
+  const pendingOrder: PendingOrder =
+    {
+      id:
+        `pending-${Date.now()}`,
 
-    clientName:
-      "Client non confirmé",
+      clientName:
+        "Client non confirmé",
 
-    phone:
-      "Non renseigné",
+      phone:
+        "Non renseigné",
 
-    status:
-      "En attente",
+      status:
+        "En attente",
 
-    items: cart,
+      items:
+        cart,
 
-    total,
+      total,
 
-    createdAt:
-      new Date().toLocaleString(),
-  };
+      createdAt:
+        new Date()
+          .toISOString(),
+    };
+
+  const existingOrders =
+    getPendingOrders();
 
   savePendingOrders([
+    ...existingOrders,
     pendingOrder,
   ]);
 }
