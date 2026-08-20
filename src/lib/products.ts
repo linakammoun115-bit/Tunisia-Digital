@@ -176,7 +176,7 @@ function subscriptionToRow(
 
 export async function getProducts(): Promise<
   Record<string, Subscription>
-{
+>{
 
   const { data, error } =
     await supabase
