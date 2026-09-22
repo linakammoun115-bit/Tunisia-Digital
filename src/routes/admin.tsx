@@ -22,6 +22,15 @@ import {
   setProductActive,
   type Subscription,
 } from "@/lib/products";
+import {
+  getSocialProducts,
+  createSocialProduct,
+  updateSocialProduct,
+  deleteSocialProduct,
+  setSocialProductActive,
+  type SocialProduct,
+  type SocialProductType,
+} from "@/lib/socialProducts";
 
 import {
   getClients,
@@ -82,6 +91,49 @@ function AdminPage() {
 
   const [newName, setNewName] =
     useState("");
+  const [
+  socialProducts,
+  setSocialProducts,
+] = useState<
+  Record<string, SocialProduct>
+>({});
+
+const [
+  socialLoading,
+  setSocialLoading,
+] = useState(true);
+
+const [
+  socialType,
+  setSocialType,
+] = useState<SocialProductType>(
+  "followers"
+);
+
+const [
+  socialName,
+  setSocialName,
+] = useState("");
+
+const [
+  socialQuantity,
+  setSocialQuantity,
+] = useState("");
+
+const [
+  socialPrice,
+  setSocialPrice,
+] = useState("");
+
+const [
+  socialOldPrice,
+  setSocialOldPrice,
+] = useState("");
+
+const [
+  socialDescription,
+  setSocialDescription,
+] = useState("");
 
   const [
     editingSlug,
@@ -154,7 +206,33 @@ function AdminPage() {
         to: "/admin-login",
       });
     }
-  }, [navigate]);
+  },
+            useEffect(() => {
+  const loadSocialProducts =
+    async () => {
+      try {
+        setSocialLoading(true);
+
+        const data =
+          await getSocialProducts();
+
+        setSocialProducts(data);
+      } catch (error) {
+        console.error(
+          "Erreur chargement produits sociaux:",
+          error
+        );
+
+        window.alert(
+          "Impossible de charger les produits Followers / Likes / Views."
+        );
+      } finally {
+        setSocialLoading(false);
+      }
+    };
+
+  void loadSocialProducts();
+}, []);[navigate]);
 
   const addProduct = async () => {
   const name =
@@ -249,6 +327,206 @@ function AdminPage() {
     );
   }
 };
+  const addSocialProduct =
+  async () => {
+    if (!socialName.trim()) {
+      window.alert(
+        "Écris le nom du produit."
+      );
+      return;
+    }
+
+    const quantity =
+      Number(socialQuantity);
+
+    const price =
+      Number(
+        socialPrice.replace(",", ".")
+      );
+
+    const oldPrice =
+      Number(
+        socialOldPrice.replace(",", ".")
+      );
+
+    if (
+      !quantity ||
+      quantity <= 0
+    ) {
+      window.alert(
+        "Entre une quantité valide."
+      );
+      return;
+    }
+
+    if (
+      Number.isNaN(price) ||
+      price < 0
+    ) {
+      window.alert(
+        "Entre un prix valide."
+      );
+      return;
+    }
+
+    try {
+      const product: SocialProduct =
+        {
+          name:
+            socialName.trim(),
+
+          type:
+            socialType,
+
+          quantity,
+
+          price,
+
+          oldPrice:
+            Number.isNaN(
+              oldPrice
+            )
+              ? 0
+              : oldPrice,
+
+          description:
+            socialDescription.trim(),
+
+          active: true,
+
+          position:
+            Object.keys(
+              socialProducts
+            ).length,
+        };
+
+      const id =
+        await createSocialProduct(
+          product,
+          product.position
+        );
+
+      setSocialProducts(
+        (previous) => ({
+          ...previous,
+          [id]: product,
+        })
+      );
+
+      setSocialName("");
+      setSocialQuantity("");
+      setSocialPrice("");
+      setSocialOldPrice("");
+      setSocialDescription("");
+
+      window.alert(
+        "Produit ajouté avec succès ✅"
+      );
+    } catch (error) {
+      console.error(
+        "Erreur ajout produit social:",
+        error
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+      window.alert(
+        `Impossible d'ajouter le produit.\n\n${message}`
+      );
+    }
+  };
+  const toggleSocialProduct =
+  async (
+    id: string
+  ) => {
+    const product =
+      socialProducts[id];
+
+    if (!product) {
+      return;
+    }
+
+    try {
+      const newActive =
+        !product.active;
+
+      await setSocialProductActive(
+        id,
+        newActive
+      );
+
+      setSocialProducts(
+        (previous) => ({
+          ...previous,
+
+          [id]: {
+            ...previous[id],
+            active:
+              newActive,
+          },
+        })
+      );
+    } catch (error) {
+      console.error(
+        "Erreur changement état produit social:",
+        error
+      );
+
+      window.alert(
+        "Impossible de modifier l'état du produit."
+      );
+    }
+  };
+  const deleteSocial =
+  async (
+    id: string
+  ) => {
+    const product =
+      socialProducts[id];
+
+    if (!product) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Supprimer "${product.name}" ?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteSocialProduct(
+        id
+      );
+
+      setSocialProducts(
+        (previous) => {
+          const updated = {
+            ...previous,
+          };
+
+          delete updated[id];
+
+          return updated;
+        }
+      );
+    } catch (error) {
+      console.error(
+        "Erreur suppression produit social:",
+        error
+      );
+
+      window.alert(
+        "Impossible de supprimer le produit."
+      );
+    }
+  };
 
   const toggleVisible = async (
     id: string
@@ -1169,6 +1447,234 @@ function AdminPage() {
             <h2 className="mb-4 text-2xl font-bold">
               Ajouter produit
             </h2>
+            <section className="mb-8 rounded-2xl border bg-card p-6">
+  <h2 className="mb-6 text-2xl font-bold">
+    Gestion Followers / Likes / Views
+  </h2>
+
+  <div className="mb-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+
+    <select
+      className="rounded-md border bg-background px-4 py-2"
+      value={socialType}
+      onChange={(event) =>
+        setSocialType(
+          event.target.value as SocialProductType
+        )
+      }
+    >
+      <option value="followers">
+        Followers
+      </option>
+
+      <option value="likes">
+        Likes
+      </option>
+
+      <option value="views">
+        Views
+      </option>
+    </select>
+
+    <input
+      className="rounded-md border bg-background px-4 py-2"
+      placeholder="Nom du produit"
+      value={socialName}
+      onChange={(event) =>
+        setSocialName(
+          event.target.value
+        )
+      }
+    />
+
+    <input
+      type="number"
+      className="rounded-md border bg-background px-4 py-2"
+      placeholder="Quantité"
+      value={socialQuantity}
+      onChange={(event) =>
+        setSocialQuantity(
+          event.target.value
+        )
+      }
+    />
+
+    <input
+      type="number"
+      step="0.01"
+      className="rounded-md border bg-background px-4 py-2"
+      placeholder="Prix"
+      value={socialPrice}
+      onChange={(event) =>
+        setSocialPrice(
+          event.target.value
+        )
+      }
+    />
+
+    <input
+      type="number"
+      step="0.01"
+      className="rounded-md border bg-background px-4 py-2"
+      placeholder="Ancien prix"
+      value={socialOldPrice}
+      onChange={(event) =>
+        setSocialOldPrice(
+          event.target.value
+        )
+      }
+    />
+
+    <input
+      className="rounded-md border bg-background px-4 py-2"
+      placeholder="Description"
+      value={socialDescription}
+      onChange={(event) =>
+        setSocialDescription(
+          event.target.value
+        )
+      }
+    />
+
+  </div>
+
+  <button
+    type="button"
+    onClick={addSocialProduct}
+    className="mb-8 rounded-md bg-primary px-5 py-2 text-primary-foreground"
+  >
+    Ajouter produit social
+  </button>
+
+  <div className="overflow-x-auto rounded-2xl border">
+    <table className="min-w-[1000px] w-full text-left text-sm">
+
+      <thead className="bg-muted">
+        <tr>
+          <th className="p-4">
+            Nom
+          </th>
+
+          <th className="p-4">
+            Type
+          </th>
+
+          <th className="p-4">
+            Quantité
+          </th>
+
+          <th className="p-4">
+            Prix
+          </th>
+
+          <th className="p-4">
+            Ancien prix
+          </th>
+
+          <th className="p-4">
+            État
+          </th>
+
+          <th className="p-4">
+            Actions
+          </th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {socialLoading ? (
+          <tr>
+            <td
+              colSpan={7}
+              className="p-6 text-center"
+            >
+              Chargement...
+            </td>
+          </tr>
+        ) : Object.keys(
+            socialProducts
+          ).length === 0 ? (
+          <tr>
+            <td
+              colSpan={7}
+              className="p-6 text-center text-muted-foreground"
+            >
+              Aucun produit social.
+            </td>
+          </tr>
+        ) : (
+          Object.entries(
+            socialProducts
+          ).map(
+            ([id, product]) => (
+              <tr
+                key={id}
+                className="border-t"
+              >
+                <td className="p-4 font-medium">
+                  {product.name}
+                </td>
+
+                <td className="p-4">
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold">
+                    {product.type}
+                  </span>
+                </td>
+
+                <td className="p-4">
+                  {product.quantity.toLocaleString()}
+                </td>
+
+                <td className="p-4 font-bold text-primary">
+                  {product.price} DT
+                </td>
+
+                <td className="p-4 text-muted-foreground line-through">
+                  {product.oldPrice} DT
+                </td>
+
+                <td className="p-4">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      toggleSocialProduct(
+                        id
+                      )
+                    }
+                    className={
+                      product.active
+                        ? "rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white"
+                        : "rounded-full bg-gray-500 px-3 py-1 text-xs font-bold text-white"
+                    }
+                  >
+                    {product.active
+                      ? "Visible"
+                      : "Invisible"}
+                  </button>
+                </td>
+
+                <td className="p-4">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      deleteSocial(
+                        id
+                      )
+                    }
+                    className="rounded-md bg-destructive px-3 py-2 text-xs text-destructive-foreground"
+                  >
+                    Supprimer
+                  </button>
+                </td>
+              </tr>
+            )
+          )
+        )}
+      </tbody>
+
+    </table>
+  </div>
+</section>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <input
