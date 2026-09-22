@@ -157,75 +157,98 @@ function AdminPage() {
   }, [navigate]);
 
   const addProduct = async () => {
-    if (!newName.trim()) {
-      window.alert(
-        "Écris le nom du produit."
-      );
-      return;
-    }
+  const name =
+    newName.trim();
 
-    const duplicate = Object.values(
-      products
-    ).some(
-      (product) =>
-        product.name.trim().toLowerCase() ===
-        newName.trim().toLowerCase()
+  if (!name) {
+    window.alert(
+      "Écris le nom du produit."
     );
+    return;
+  }
 
-    if (duplicate) {
-      window.alert(
-        "Ce produit existe déjà."
-      );
-      return;
-    }
+  try {
+    const product: Subscription = {
+      name,
 
-    const newProduct: Subscription = {
-      name: newName.trim(),
       oldPrice: "0 DT",
-      duration: "1 month",
-      category: "New",
-      description: "",
-      features: [],
-      active: true,
+
+      duration:
+        "1 month",
+
+      category:
+        "New",
+
+      description:
+        "",
+
+      features:
+        [],
+
+      active:
+        true,
+
       pricesByDuration: {
-        "1 month": "0 DT",
-        "6 months": "0 DT",
-        "1 year": "0 DT",
+        "1 month":
+          "0 DT",
+
+        "6 months":
+          "0 DT",
+
+        "1 year":
+          "0 DT",
       },
     };
 
-    try {
-      const id = await createProduct(
-        newProduct,
-        Object.keys(products).length
+    console.log(
+      "Produit envoyé à Supabase:",
+      product
+    );
+
+    const id =
+      await createProduct(
+        product,
+        Object.keys(
+          products
+        ).length
       );
 
-      setProducts((previous) => ({
+    console.log(
+      "Produit créé avec ID:",
+      id
+    );
+
+    setProducts(
+      (previous) => ({
         ...previous,
-        [id]: newProduct,
-      }));
 
-      setNewName("");
+        [id]:
+          product,
+      })
+    );
 
-      window.alert(
-        "Produit ajouté avec succès."
-      );
-   } catch (error) {
-  console.error(
-    "Erreur ajout produit Supabase:",
-    error
-  );
+    setNewName("");
 
-  const message =
-    error instanceof Error
-      ? error.message
-      : JSON.stringify(error);
+    window.alert(
+      "Produit ajouté avec succès ✅"
+    );
 
-  window.alert(
-    `Impossible d'ajouter le produit.\n\nErreur Supabase : ${message}`
-  );
-}
-  };
+  } catch (error) {
+    console.error(
+      "ERREUR AJOUT PRODUIT:",
+      error
+    );
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : JSON.stringify(error);
+
+    window.alert(
+      `Impossible d'ajouter le produit.\n\n${message}`
+    );
+  }
+};
 
   const toggleVisible = async (
     id: string
