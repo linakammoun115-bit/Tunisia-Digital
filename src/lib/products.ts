@@ -414,21 +414,24 @@ export async function createProduct(
   product: Subscription,
   position = 0
 ): Promise<string> {
-  const row =
-    subscriptionToRow(
+  const id = crypto.randomUUID();
+
+  const row = {
+    id,
+    ...subscriptionToRow(
       product,
       position
-    );
+    ),
+  };
 
   const {
     data,
     error,
-  } =
-    await supabase
-      .from("products")
-      .insert(row)
-      .select("id")
-      .single();
+  } = await supabase
+    .from("products")
+    .insert(row)
+    .select("id")
+    .single();
 
   if (error) {
     console.error(
@@ -441,11 +444,8 @@ export async function createProduct(
     );
   }
 
-  return String(
-    data.id
-  );
+  return String(data.id);
 }
-
 /* =========================================================
    UPDATE PRODUCT
 ========================================================= */
