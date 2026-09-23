@@ -467,13 +467,27 @@ export function Subscriptions() {
               ? loadedSocialProducts
               : [];
 
-          setSocialProducts(
-            validProducts.filter(
-              (product) =>
-                product &&
-                product.active === true
-            )
-          );
+        setSocialProducts(
+  validProducts.filter((product) => {
+    if (!product) return false;
+
+    // Accepte plusieurs formats possibles
+    // pour le champ active
+    if (product.active === false) {
+      return false;
+    }
+
+    if (
+      product.active === "false" ||
+      product.active === "0" ||
+      product.active === 0
+    ) {
+      return false;
+    }
+
+    return true;
+  })
+);
         } catch (error) {
           console.error(
             "Erreur chargement produits sociaux :",
