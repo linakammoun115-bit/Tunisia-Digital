@@ -157,6 +157,10 @@ function AdminPage() {
      ADMIN AUTH
   ========================================================= */
 
+  // =========================
+  // AUTH ADMIN
+  // =========================
+
   useEffect(() => {
     const isAdmin =
       localStorage.getItem("adminAuth") === "true";
@@ -167,6 +171,94 @@ function AdminPage() {
       });
     }
   }, [navigate]);
+
+
+  // =========================
+  // CHARGEMENT PRODUITS
+  // =========================
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadProducts = async () => {
+      try {
+        setProductsLoading(true);
+        setProductsError("");
+
+        const data = await getProducts();
+
+        if (mounted) {
+          setProducts(data);
+        }
+      } catch (error) {
+        console.error(
+          "Erreur chargement produits Supabase:",
+          error
+        );
+
+        if (mounted) {
+          setProductsError(
+            error instanceof Error
+              ? error.message
+              : "Impossible de charger les produits."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setProductsLoading(false);
+        }
+      }
+    };
+
+    void loadProducts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+
+  // =========================
+  // CHARGEMENT PRODUITS SOCIAUX
+  // FOLLOWERS / LIKES / VIEWS
+  // =========================
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSocialProducts = async () => {
+      try {
+        setSocialLoading(true);
+
+        const data = await getSocialProducts();
+
+        if (mounted) {
+          setSocialProducts(data);
+        }
+      } catch (error) {
+        console.error(
+          "Erreur chargement produits sociaux:",
+          error
+        );
+
+        if (mounted) {
+          window.alert(
+            "Impossible de charger les produits Followers / Likes / Views."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setSocialLoading(false);
+        }
+      }
+    };
+
+    void loadSocialProducts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
 
   /* =========================================================
