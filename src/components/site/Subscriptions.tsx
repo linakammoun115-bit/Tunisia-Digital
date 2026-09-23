@@ -345,13 +345,22 @@ const [socialError, setSocialError] =
           setAdminProducts(loadedProducts);
         }
       } catch (error) {
-        console.error("Erreur chargement produits:", error);
+  console.error(
+    "Erreur chargement produits sociaux:",
+    error
+  );
 
-        if (mounted) {
-          setProductsError(
-            "Impossible de charger les produits. Vérifie Supabase et ta connexion."
-          );
-        }
+  if (mounted) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    setSocialError(
+      `Erreur Supabase : ${message}`
+    );
+  }
+}
       } finally {
         if (mounted) {
           setProductsLoading(false);
