@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useState, type ElementType } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ElementType,
+} from "react";
+
 import {
   getProducts,
   subscribeToProducts,
   type Subscription,
 } from "@/lib/products";
+
 import {
   getSocialProducts,
   type SocialProduct,
@@ -28,6 +35,10 @@ import {
   type WheelReward,
 } from "@/lib/wheelReward";
 
+/* =========================================================
+   TYPES
+========================================================= */
+
 type Plan = {
   name: string;
   slug: string;
@@ -43,6 +54,10 @@ type Plan = {
 
 type SocialService = SocialProduct;
 
+/* =========================================================
+   CATEGORIES
+========================================================= */
+
 const baseCategories = [
   "All",
   "AI Tools",
@@ -51,6 +66,10 @@ const baseCategories = [
   "Productivity",
   "Education",
 ];
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function parsePrice(value: unknown): number {
   const normalized = String(value ?? "0")
@@ -63,7 +82,9 @@ function parsePrice(value: unknown): number {
 }
 
 function formatPrice(price: number): string {
-  return Number.isInteger(price) ? String(price) : price.toFixed(2);
+  return Number.isInteger(price)
+    ? String(price)
+    : price.toFixed(2);
 }
 
 function normalizeText(value: string): string {
@@ -75,6 +96,32 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+/* =========================================================
+   SOCIAL TYPE
+========================================================= */
+
+function normalizeSocialType(
+  type: unknown
+): "followers" | "likes" | "views" {
+  const normalized = String(type ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized === "likes") {
+    return "likes";
+  }
+
+  if (normalized === "views") {
+    return "views";
+  }
+
+  return "followers";
+}
+
+/* =========================================================
+   REWARD
+========================================================= */
+
 function isRewardCompatible(
   reward: WheelReward | null,
   productName: string
@@ -83,55 +130,113 @@ function isRewardCompatible(
     return false;
   }
 
-  const normalizedLabel = normalizeText(reward.label);
-  const normalizedProduct = normalizeText(productName);
+  const normalizedLabel = normalizeText(
+    reward.label
+  );
 
-  if (normalizedLabel.includes("5% sur votre achat")) {
+  const normalizedProduct =
+    normalizeText(productName);
+
+  if (
+    normalizedLabel.includes(
+      "5% sur votre achat"
+    )
+  ) {
     return true;
   }
 
-  if (normalizedLabel.includes("2k followers")) {
-    const cleanProductName = normalizedProduct
-      .replace(/\s*\(followers\)\s*$/, "")
-      .trim();
+  if (
+    normalizedLabel.includes(
+      "2k followers"
+    )
+  ) {
+    const cleanProductName =
+      normalizedProduct
+        .replace(
+          /\s*\(followers\)\s*$/,
+          ""
+        )
+        .trim();
 
-    return cleanProductName === "2k followers";
+    return (
+      cleanProductName ===
+      "2k followers"
+    );
   }
 
-  if (normalizedLabel.includes("gemini")) {
-    return normalizedProduct.includes("gemini");
+  if (
+    normalizedLabel.includes(
+      "gemini"
+    )
+  ) {
+    return normalizedProduct.includes(
+      "gemini"
+    );
   }
 
-  if (normalizedLabel.includes("spotify")) {
-    return normalizedProduct.includes("spotify");
+  if (
+    normalizedLabel.includes(
+      "spotify"
+    )
+  ) {
+    return normalizedProduct.includes(
+      "spotify"
+    );
   }
 
-  if (normalizedLabel.includes("canva")) {
-    return normalizedProduct.includes("canva");
+  if (
+    normalizedLabel.includes(
+      "canva"
+    )
+  ) {
+    return normalizedProduct.includes(
+      "canva"
+    );
   }
 
-  if (normalizedLabel.includes("linkedin")) {
-    return normalizedProduct.includes("linkedin");
+  if (
+    normalizedLabel.includes(
+      "linkedin"
+    )
+  ) {
+    return normalizedProduct.includes(
+      "linkedin"
+    );
   }
 
-  return canUseRewardOnProduct(reward, productName);
+  return canUseRewardOnProduct(
+    reward,
+    productName
+  );
 }
+
+/* =========================================================
+   CART
+========================================================= */
 
 function getStoredCart(): any[] {
   try {
-    const savedCart = localStorage.getItem("cart");
+    const savedCart =
+      localStorage.getItem("cart");
 
     if (!savedCart) {
       return [];
     }
 
-    const parsed = JSON.parse(savedCart);
+    const parsed =
+      JSON.parse(savedCart);
 
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed
+      : [];
   } catch {
     return [];
   }
 }
+
+/* =========================================================
+   ADD SOCIAL PRODUCT TO CART
+========================================================= */
 
 function addSocialToCart(
   service: SocialService,
@@ -139,13 +244,17 @@ function addSocialToCart(
   reward: WheelReward | null,
   onRewardUsed: () => void
 ): void {
-  const cart = getStoredCart();
-  const productName = `${service.name} (${type})`;
+  const cart =
+    getStoredCart();
 
-  const rewardCanBeUsed = isRewardCompatible(
-    reward,
-    productName
-  );
+  const productName =
+    `${service.name} (${type})`;
+
+  const rewardCanBeUsed =
+    isRewardCompatible(
+      reward,
+      productName
+    );
 
   const finalPrice =
     rewardCanBeUsed && reward
@@ -155,43 +264,54 @@ function addSocialToCart(
         )
       : service.price;
 
-  const slug = `social-${type}-${service.name}`
-    .toLowerCase()
-    .replace(/\s+/g, "-");
+  const slug =
+    `social-${type}-${service.name}`
+      .toLowerCase()
+      .replace(/\s+/g, "-");
 
-  const existingItem = cart.find(
-    (item) => item.slug === slug
-  );
-
-  const updatedCart = existingItem
-    ? cart.map((item) =>
+  const existingItem =
+    cart.find(
+      (item) =>
         item.slug === slug
-          ? {
-              ...item,
-              quantity:
-                Number(item.quantity ?? 0) + 1,
-            }
-          : item
-      )
-    : [
-        ...cart,
-        {
-          slug,
-          name: productName,
-          price: finalPrice,
-          originalPrice: service.price,
-          duration: "Social Boost",
-          quantity: 1,
-          wheelReward:
-            rewardCanBeUsed && reward
-              ? {
-                  id: reward.id,
-                  label: reward.label,
-                  percentage: reward.percentage,
-                }
-              : null,
-        },
-      ];
+    );
+
+  const updatedCart =
+    existingItem
+      ? cart.map((item) =>
+          item.slug === slug
+            ? {
+                ...item,
+                quantity:
+                  Number(
+                    item.quantity ?? 0
+                  ) + 1,
+              }
+            : item
+        )
+      : [
+          ...cart,
+          {
+            slug,
+            name: productName,
+            price: finalPrice,
+            originalPrice:
+              service.price,
+            duration:
+              "Social Boost",
+            quantity: 1,
+            wheelReward:
+              rewardCanBeUsed &&
+              reward
+                ? {
+                    id: reward.id,
+                    label:
+                      reward.label,
+                    percentage:
+                      reward.percentage,
+                  }
+                : null,
+          },
+        ];
 
   localStorage.setItem(
     "cart",
@@ -199,7 +319,10 @@ function addSocialToCart(
   );
 
   if (rewardCanBeUsed) {
-    consumeWheelReward(productName);
+    consumeWheelReward(
+      productName
+    );
+
     onRewardUsed();
   }
 
@@ -213,6 +336,10 @@ function addSocialToCart(
       : "Produit ajouté au panier ✅"
   );
 }
+
+/* =========================================================
+   SOCIAL SECTION
+========================================================= */
 
 function SocialSection({
   title,
@@ -239,91 +366,143 @@ function SocialSection({
       </h3>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {services.map((service) => {
-          const productName = `${service.name} (${title})`;
+        {services.map(
+          (service, index) => {
+            const productName =
+              `${service.name} (${title})`;
 
-          const rewardCanBeUsed =
-            isRewardCompatible(
-              wheelReward,
-              productName
+            const rewardCanBeUsed =
+              isRewardCompatible(
+                wheelReward,
+                productName
+              );
+
+            const displayedPrice =
+              rewardCanBeUsed &&
+              wheelReward
+                ? calculateRewardPrice(
+                    service.price,
+                    wheelReward.percentage
+                  )
+                : service.price;
+
+            return (
+              <article
+                key={`${title}-${service.name}-${index}`}
+                className="group relative overflow-hidden rounded-3xl p-6 gradient-border hover-lift"
+              >
+                <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl transition group-hover:bg-accent/20" />
+
+                <div className="relative z-10">
+                  {/* TYPE */}
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                      {title}
+                    </span>
+
+                    {rewardCanBeUsed && (
+                      <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-success">
+                        🎁 -
+                        {wheelReward?.percentage ??
+                          0}
+                        %
+                      </span>
+                    )}
+                  </div>
+
+                  {/* NAME */}
+                  <h4 className="text-xl font-bold">
+                    {service.name}
+                  </h4>
+
+                  {/* QUANTITY */}
+                  {service.quantity >
+                    0 && (
+                    <p className="mt-2 text-sm font-semibold text-primary">
+                      {service.quantity.toLocaleString(
+                        "fr-FR"
+                      )}{" "}
+                      {normalizeSocialType(
+                        service.type
+                      )}
+                    </p>
+                  )}
+
+                  {/* DESCRIPTION */}
+                  <p className="mt-3 min-h-[48px] text-sm leading-relaxed text-muted-foreground">
+                    {service.description ||
+                      "Package Social Boost"}
+                  </p>
+
+                  {/* REWARD */}
+                  {rewardCanBeUsed && (
+                    <div className="mt-4 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
+                      🎁 Offre roue disponible
+                    </div>
+                  )}
+
+                  {/* PRICE */}
+                  <div className="mt-4 flex items-end gap-2">
+                    <div className="text-3xl font-bold gradient-text">
+                      {formatPrice(
+                        displayedPrice
+                      )}{" "}
+                      DT
+                    </div>
+
+                    {rewardCanBeUsed && (
+                      <span className="mb-1 text-sm text-muted-foreground line-through">
+                        {formatPrice(
+                          service.price
+                        )}{" "}
+                        DT
+                      </span>
+                    )}
+                  </div>
+
+                  {/* OLD PRICE */}
+                  {!rewardCanBeUsed &&
+                    service.oldPrice >
+                      service.price && (
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        Au lieu de{" "}
+                        <span className="line-through">
+                          {formatPrice(
+                            service.oldPrice
+                          )}{" "}
+                          DT
+                        </span>
+                      </div>
+                    )}
+
+                  {/* BUTTON */}
+                  <button
+                    type="button"
+                    className="mt-6 w-full rounded-xl py-2 gradient-primary text-white transition-opacity hover:opacity-90"
+                    onClick={() =>
+                      addSocialToCart(
+                        service,
+                        title,
+                        wheelReward,
+                        onRewardUsed
+                      )
+                    }
+                  >
+                    Add to Cart
+                  </button>
+                </div>
+              </article>
             );
-
-          const displayedPrice =
-            rewardCanBeUsed && wheelReward
-              ? calculateRewardPrice(
-                  service.price,
-                  wheelReward.percentage
-                )
-              : service.price;
-
-          return (
-            <article
-              key={`${title}-${service.name}`}
-              className="group relative overflow-hidden rounded-3xl p-6 gradient-border hover-lift"
-            >
-              <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl transition group-hover:bg-accent/20" />
-
-              <div className="relative z-10">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-                    {title}
-                  </span>
-
-                  {rewardCanBeUsed && (
-                    <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-success">
-                      🎁 -{wheelReward?.percentage ?? 0}%
-                    </span>
-                  )}
-                </div>
-
-                <h4 className="text-xl font-bold">
-                  {service.name}
-                </h4>
-
-                <p className="mt-3 min-h-[48px] text-sm leading-relaxed text-muted-foreground">
-                  {service.desc}
-                </p>
-
-                {rewardCanBeUsed && (
-                  <div className="mt-4 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
-                    🎁 Offre roue disponible
-                  </div>
-                )}
-
-                <div className="mt-4 flex items-end gap-2">
-                  <div className="text-3xl font-bold gradient-text">
-                    {formatPrice(displayedPrice)} DT
-                  </div>
-
-                  {rewardCanBeUsed && (
-                    <span className="mb-1 text-sm text-muted-foreground line-through">
-                      {formatPrice(service.price)} DT
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className="mt-6 w-full rounded-xl py-2 gradient-primary text-white"
-                  onClick={() =>
-                    addSocialToCart(
-                      service,
-                      title,
-                      wheelReward,
-                      onRewardUsed
-                    )
-                  }
-                >
-                  Add to Cart
-                </button>
-              </div>
-            </article>
-          );
-        })}
+          }
+        )}
       </div>
     </div>
   );
 }
+
+/* =========================================================
+   MAIN COMPONENT
+========================================================= */
 
 export function Subscriptions() {
   const [category, setCategory] =
@@ -333,7 +512,9 @@ export function Subscriptions() {
     useState("recommended");
 
   const [adminProducts, setAdminProducts] =
-    useState<Record<string, Subscription>>({});
+    useState<
+      Record<string, Subscription>
+    >({});
 
   const [productsLoading, setProductsLoading] =
     useState(true);
@@ -352,15 +533,22 @@ export function Subscriptions() {
 
   const [wheelReward, setWheelReward] =
     useState<WheelReward | null>(() => {
-      const reward = getWheelReward();
+      const reward =
+        getWheelReward();
 
-      return reward && !reward.used
+      return reward &&
+        !reward.used
         ? reward
         : null;
     });
 
+  /* =======================================================
+     REFRESH REWARD
+  ======================================================= */
+
   const refreshReward = () => {
-    const reward = getWheelReward();
+    const reward =
+      getWheelReward();
 
     setWheelReward(
       reward && !reward.used
@@ -369,62 +557,71 @@ export function Subscriptions() {
     );
   };
 
-  /*
-   * ================================
-   * PRODUITS CLASSIQUES
-   * ================================
-   */
+  /* =======================================================
+     LOAD NORMAL PRODUCTS
+  ======================================================= */
+
   useEffect(() => {
     let mounted = true;
 
-    const refreshProducts = async () => {
-      try {
-        if (mounted) {
-          setProductsLoading(true);
-          setProductsError("");
-        }
+    const refreshProducts =
+      async () => {
+        try {
+          if (mounted) {
+            setProductsLoading(
+              true
+            );
 
-        const loadedProducts =
-          await getProducts();
+            setProductsError("");
+          }
 
-        if (!mounted) {
-          return;
-        }
+          const loadedProducts =
+            await getProducts();
 
-        setAdminProducts(
-          loadedProducts ?? {}
-        );
-      } catch (error) {
-        console.error(
-          "Erreur chargement produits :",
-          error
-        );
+          if (!mounted) {
+            return;
+          }
 
-        if (mounted) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : String(error);
-
-          setProductsError(
-            `Impossible de charger les produits. ${
-              message || ""
-            }`
+          setAdminProducts(
+            loadedProducts ?? {}
           );
+        } catch (error) {
+          console.error(
+            "Erreur chargement produits :",
+            error
+          );
+
+          if (mounted) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : String(error);
+
+            setProductsError(
+              `Impossible de charger les produits.${
+                message
+                  ? ` ${message}`
+                  : ""
+              }`
+            );
+          }
+        } finally {
+          if (mounted) {
+            setProductsLoading(
+              false
+            );
+          }
         }
-      } finally {
-        if (mounted) {
-          setProductsLoading(false);
-        }
-      }
-    };
+      };
 
     void refreshProducts();
 
     const unsubscribe =
-      subscribeToProducts(() => {
-        void refreshProducts();
-      });
+      subscribeToProducts(
+        () => {
+          void refreshProducts();
+        }
+      );
 
     return () => {
       mounted = false;
@@ -432,11 +629,10 @@ export function Subscriptions() {
     };
   }, []);
 
-  /*
-   * ================================
-   * PRODUITS SOCIAUX
-   * ================================
-   */
+  /* =======================================================
+     LOAD SOCIAL PRODUCTS
+  ======================================================= */
+
   useEffect(() => {
     let mounted = true;
 
@@ -444,7 +640,10 @@ export function Subscriptions() {
       async () => {
         try {
           if (mounted) {
-            setSocialLoading(true);
+            setSocialLoading(
+              true
+            );
+
             setSocialError("");
           }
 
@@ -452,7 +651,11 @@ export function Subscriptions() {
             await getSocialProducts();
 
           console.log(
-            "Produits sociaux reçus :",
+            "================================"
+          );
+
+          console.log(
+            "PRODUITS SOCIAUX SUPABASE :",
             loadedSocialProducts
           );
 
@@ -460,37 +663,75 @@ export function Subscriptions() {
             return;
           }
 
-          const validProducts =
-            Array.isArray(
-              loadedSocialProducts
-            )
-              ? loadedSocialProducts
-              : [];
+          /*
+           * IMPORTANT :
+           *
+           * getSocialProducts()
+           * retourne un Record<string, SocialProduct>
+           *
+           * Il faut donc utiliser
+           * Object.values().
+           */
 
-        setSocialProducts(
-  validProducts.filter((product) => {
-    if (!product) return false;
+          const productsArray =
+            Object.values(
+              loadedSocialProducts ?? {}
+            );
 
-    // Accepte plusieurs formats possibles
-    // pour le champ active
-    if (product.active === false) {
-      return false;
-    }
+          console.log(
+            "PRODUITS SOCIAUX EN TABLEAU :",
+            productsArray
+          );
 
-    if (
-      product.active === "false" ||
-      product.active === "0" ||
-      product.active === 0
-    ) {
-      return false;
-    }
+          /*
+           * Normalisation du type.
+           */
 
-    return true;
-  })
-);
+          const normalizedProducts =
+            productsArray.map(
+              (product) => ({
+                ...product,
+                type:
+                  normalizeSocialType(
+                    product.type
+                  ),
+                active:
+                  product.active !==
+                  false,
+              })
+            );
+
+          console.log(
+            "PRODUITS SOCIAUX NORMALISÉS :",
+            normalizedProducts
+          );
+
+          /*
+           * Seulement les produits actifs.
+           */
+
+          const activeProducts =
+            normalizedProducts.filter(
+              (product) =>
+                product.active ===
+                true
+            );
+
+          console.log(
+            "PRODUITS SOCIAUX ACTIFS :",
+            activeProducts
+          );
+
+          setSocialProducts(
+            activeProducts
+          );
         } catch (error) {
           console.error(
-            "Erreur chargement produits sociaux :",
+            "================================"
+          );
+
+          console.error(
+            "ERREUR PRODUITS SOCIAUX :",
             error
           );
 
@@ -512,7 +753,9 @@ export function Subscriptions() {
           }
         } finally {
           if (mounted) {
-            setSocialLoading(false);
+            setSocialLoading(
+              false
+            );
           }
         }
       };
@@ -524,11 +767,10 @@ export function Subscriptions() {
     };
   }, []);
 
-  /*
-   * ================================
-   * CATEGORY
-   * ================================
-   */
+  /* =======================================================
+     CATEGORY
+  ======================================================= */
+
   useEffect(() => {
     const handleCategorySelected =
       () => {
@@ -539,7 +781,9 @@ export function Subscriptions() {
 
         if (selected) {
           setCategory(selected);
-          setSortBy("recommended");
+          setSortBy(
+            "recommended"
+          );
         }
       };
 
@@ -558,11 +802,10 @@ export function Subscriptions() {
     };
   }, []);
 
-  /*
-   * ================================
-   * WHEEL REWARD
-   * ================================
-   */
+  /* =======================================================
+     WHEEL REWARD
+  ======================================================= */
+
   useEffect(() => {
     refreshReward();
 
@@ -589,123 +832,134 @@ export function Subscriptions() {
     };
   }, []);
 
-  /*
-   * ================================
-   * CATEGORIES
-   * ================================
-   */
-  const categories = useMemo(() => {
-    const productCategories =
-      Object.values(adminProducts)
-        .map(
-          (product) =>
-            product.category
+  /* =======================================================
+     CATEGORIES
+  ======================================================= */
+
+  const categories =
+    useMemo(() => {
+      const productCategories =
+        Object.values(
+          adminProducts
         )
-        .filter(
-          (
-            productCategory
-          ): productCategory is string =>
-            typeof productCategory ===
-              "string" &&
-            productCategory.trim()
-              .length > 0
-        );
+          .map(
+            (product) =>
+              product.category
+          )
+          .filter(
+            (
+              productCategory
+            ): productCategory is string =>
+              typeof productCategory ===
+                "string" &&
+              productCategory
+                .trim()
+                .length > 0
+          );
 
-    return [
-      ...new Set([
-        ...baseCategories,
-        ...productCategories,
-      ]),
-    ];
-  }, [adminProducts]);
+      return [
+        ...new Set([
+          ...baseCategories,
+          ...productCategories,
+        ]),
+      ];
+    }, [adminProducts]);
 
-  /*
-   * ================================
-   * FILTERED PLANS
-   * ================================
-   */
+  /* =======================================================
+     FILTERED PLANS
+  ======================================================= */
+
   const filteredPlans =
     useMemo<Plan[]>(() => {
-      const result = Object.entries(
-        adminProducts
-      )
-        .filter(
-          ([, product]) =>
-            product.active
+      const result =
+        Object.entries(
+          adminProducts
         )
-        .map(
-          ([slug, product]) => {
-            const originalPrice =
-              parsePrice(
-                product
-                  .pricesByDuration?.[
-                  "1 month"
-                ]
-              );
+          .filter(
+            ([, product]) =>
+              product.active
+          )
+          .map(
+            ([slug, product]) => {
+              const originalPrice =
+                parsePrice(
+                  product
+                    .pricesByDuration?.[
+                    "1 month"
+                  ]
+                );
 
-            const oldPrice =
-              parsePrice(
-                product.oldPrice
-              );
+              const oldPrice =
+                parsePrice(
+                  product.oldPrice
+                );
 
-            const rewardCanBeUsed =
-              isRewardCompatible(
-                wheelReward,
-                product.name
-              );
+              const rewardCanBeUsed =
+                isRewardCompatible(
+                  wheelReward,
+                  product.name
+                );
 
-            const rewardDiscount =
-              rewardCanBeUsed &&
-              wheelReward
-                ? wheelReward.percentage
-                : 0;
+              const rewardDiscount =
+                rewardCanBeUsed &&
+                wheelReward
+                  ? wheelReward.percentage
+                  : 0;
 
-            return {
-              name: product.name,
-              slug,
-              category:
-                product.category,
-              icon: Film,
-              price:
-                rewardCanBeUsed
-                  ? calculateRewardPrice(
-                      originalPrice,
-                      rewardDiscount
-                    )
-                  : originalPrice,
-              originalPrice,
-              oldPrice,
-              duration:
-                product.duration ||
-                "1 month",
-              accent:
-                "from-primary to-accent",
-              rewardDiscount,
-            };
-          }
-        )
-        .filter(
-          (plan) =>
-            category === "All" ||
-            plan.category === category
-        );
+              return {
+                name: product.name,
+                slug,
+                category:
+                  product.category,
+                icon: Film,
+                price:
+                  rewardCanBeUsed
+                    ? calculateRewardPrice(
+                        originalPrice,
+                        rewardDiscount
+                      )
+                    : originalPrice,
+                originalPrice,
+                oldPrice,
+                duration:
+                  product.duration ||
+                  "1 month",
+                accent:
+                  "from-primary to-accent",
+                rewardDiscount,
+              };
+            }
+          )
+          .filter(
+            (plan) =>
+              category === "All" ||
+              plan.category ===
+                category
+          );
 
       return [...result].sort(
         (a, b) => {
           if (
-            sortBy === "price-low"
+            sortBy ===
+            "price-low"
           ) {
-            return a.price - b.price;
+            return (
+              a.price - b.price
+            );
           }
 
           if (
-            sortBy === "price-high"
+            sortBy ===
+            "price-high"
           ) {
-            return b.price - a.price;
+            return (
+              b.price - a.price
+            );
           }
 
           if (
-            sortBy === "discount"
+            sortBy ===
+            "discount"
           ) {
             const discountA =
               a.oldPrice > 0
@@ -727,7 +981,9 @@ export function Subscriptions() {
             );
           }
 
-          if (sortBy === "name") {
+          if (
+            sortBy === "name"
+          ) {
             return a.name.localeCompare(
               b.name
             );
@@ -743,9 +999,14 @@ export function Subscriptions() {
       wheelReward,
     ]);
 
+  /* =======================================================
+     FILTERS
+  ======================================================= */
+
   const hasActiveFilters =
     category !== "All" ||
-    sortBy !== "recommended";
+    sortBy !==
+      "recommended";
 
   const resetFilters = () => {
     localStorage.removeItem(
@@ -753,8 +1014,54 @@ export function Subscriptions() {
     );
 
     setCategory("All");
-    setSortBy("recommended");
+    setSortBy(
+      "recommended"
+    );
   };
+
+  /* =======================================================
+     SOCIAL GROUPS
+  ======================================================= */
+
+  const followersProducts =
+    useMemo(
+      () =>
+        socialProducts.filter(
+          (product) =>
+            normalizeSocialType(
+              product.type
+            ) === "followers"
+        ),
+      [socialProducts]
+    );
+
+  const viewsProducts =
+    useMemo(
+      () =>
+        socialProducts.filter(
+          (product) =>
+            normalizeSocialType(
+              product.type
+            ) === "views"
+        ),
+      [socialProducts]
+    );
+
+  const likesProducts =
+    useMemo(
+      () =>
+        socialProducts.filter(
+          (product) =>
+            normalizeSocialType(
+              product.type
+            ) === "likes"
+        ),
+      [socialProducts]
+    );
+
+  /* =======================================================
+     RENDER
+  ======================================================= */
 
   return (
     <section
@@ -763,9 +1070,10 @@ export function Subscriptions() {
     >
       <div className="container relative z-10 mx-auto px-6">
 
-        {/* =========================
+        {/* =================================================
             HEADER
-        ========================== */}
+        ================================================= */}
+
         <div className="mx-auto mb-12 max-w-2xl text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-primary glass">
             <Flame className="h-3.5 w-3.5" />
@@ -785,9 +1093,10 @@ export function Subscriptions() {
           </p>
         </div>
 
-        {/* =========================
+        {/* =================================================
             WHEEL REWARD
-        ========================== */}
+        ================================================= */}
+
         {wheelReward && (
           <div className="mx-auto mb-10 max-w-4xl overflow-hidden rounded-3xl border border-primary/30 bg-primary/10 p-6 shadow-lg">
             <div className="flex flex-col items-center gap-4 text-center md:flex-row md:text-left">
@@ -818,31 +1127,37 @@ export function Subscriptions() {
           </div>
         )}
 
-        {/* =========================
+        {/* =================================================
             FILTERS
-        ========================== */}
+        ================================================= */}
+
         <div className="mx-auto mb-10 max-w-6xl rounded-3xl p-4 glass">
           <div className="mb-4 flex flex-wrap gap-2">
-            {categories.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => {
-                  localStorage.removeItem(
-                    "selectedCategory"
-                  );
+            {categories.map(
+              (item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem(
+                      "selectedCategory"
+                    );
 
-                  setCategory(item);
-                }}
-                className={`rounded-full px-4 py-2 text-sm transition-smooth ${
-                  category === item
-                    ? "gradient-primary text-white"
-                    : "border border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
+                    setCategory(
+                      item
+                    );
+                  }}
+                  className={`rounded-full px-4 py-2 text-sm transition-smooth ${
+                    category ===
+                    item
+                      ? "gradient-primary text-white"
+                      : "border border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {item}
+                </button>
+              )
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -863,17 +1178,23 @@ export function Subscriptions() {
                 "discount",
                 "Best discount",
               ],
-              ["name", "A-Z"],
+              [
+                "name",
+                "A-Z",
+              ],
             ].map(
               ([value, label]) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() =>
-                    setSortBy(value)
+                    setSortBy(
+                      value
+                    )
                   }
                   className={`rounded-full px-3 py-1 text-xs transition-smooth ${
-                    sortBy === value
+                    sortBy ===
+                    value
                       ? "gradient-primary text-white"
                       : "border border-border text-muted-foreground hover:text-foreground"
                   }`}
@@ -887,7 +1208,9 @@ export function Subscriptions() {
           {hasActiveFilters && (
             <button
               type="button"
-              onClick={resetFilters}
+              onClick={
+                resetFilters
+              }
               className="mt-4 text-sm text-primary hover:text-foreground"
             >
               Reset filters
@@ -895,9 +1218,10 @@ export function Subscriptions() {
           )}
         </div>
 
-        {/* =========================
+        {/* =================================================
             NORMAL PRODUCTS
-        ========================== */}
+        ================================================= */}
+
         {productsLoading && (
           <div className="mx-auto mb-8 max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center text-muted-foreground">
             Chargement des produits...
@@ -912,15 +1236,18 @@ export function Subscriptions() {
 
         {!productsLoading &&
           !productsError &&
-          filteredPlans.length === 0 && (
+          filteredPlans.length ===
+            0 && (
             <div className="mx-auto mb-8 max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center">
               <p className="font-semibold">
-                Aucun produit disponible
+                Aucun produit
+                disponible
               </p>
 
               <p className="mt-2 text-sm text-muted-foreground">
-                Aucun produit actif ne
-                correspond à cette catégorie.
+                Aucun produit actif
+                ne correspond à
+                cette catégorie.
               </p>
             </div>
           )}
@@ -928,11 +1255,14 @@ export function Subscriptions() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {filteredPlans.map(
             (plan) => {
-              const Icon = plan.icon;
+              const Icon =
+                plan.icon;
 
               return (
                 <article
-                  key={plan.slug}
+                  key={
+                    plan.slug
+                  }
                   className="group relative overflow-hidden rounded-2xl p-6 gradient-border hover-lift"
                 >
                   <div className="pointer-events-none absolute inset-0 opacity-0 transition-smooth group-hover:opacity-100">
@@ -962,11 +1292,15 @@ export function Subscriptions() {
                     </div>
 
                     <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                      {plan.category}
+                      {
+                        plan.category
+                      }
                     </p>
 
                     <h3 className="mb-3 min-h-[48px] font-display text-lg font-bold">
-                      {plan.name}
+                      {
+                        plan.name
+                      }
                     </h3>
 
                     {plan.rewardDiscount >
@@ -1030,9 +1364,10 @@ export function Subscriptions() {
           )}
         </div>
 
-        {/* =========================
+        {/* =================================================
             SOCIAL BOOST
-        ========================== */}
+        ================================================= */}
+
         <div className="mt-24">
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-primary glass">
@@ -1047,10 +1382,12 @@ export function Subscriptions() {
             </h2>
 
             <p className="text-muted-foreground">
-              Choose followers, views or likes
-              packages separately.
+              Choose followers, views or
+              likes packages separately.
             </p>
           </div>
+
+          {/* LOADING */}
 
           {socialLoading && (
             <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center text-muted-foreground">
@@ -1058,15 +1395,21 @@ export function Subscriptions() {
             </div>
           )}
 
-          {socialError && (
-            <div className="mx-auto max-w-2xl rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center text-destructive">
-              {socialError}
-            </div>
-          )}
+          {/* ERROR */}
+
+          {!socialLoading &&
+            socialError && (
+              <div className="mx-auto max-w-2xl rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center text-destructive">
+                {socialError}
+              </div>
+            )}
+
+          {/* EMPTY */}
 
           {!socialLoading &&
             !socialError &&
-            socialProducts.length === 0 && (
+            socialProducts.length ===
+              0 && (
               <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center">
                 <p className="font-semibold">
                   Aucun produit social
@@ -1081,18 +1424,21 @@ export function Subscriptions() {
               </div>
             )}
 
+          {/* SOCIAL PRODUCTS */}
+
           {!socialLoading &&
             !socialError &&
-            socialProducts.length > 0 && (
+            socialProducts.length >
+              0 && (
               <>
                 <SocialSection
                   title="Followers"
-                  services={socialProducts.filter(
-                    (product) =>
-                      product.type ===
-                      "followers"
-                  )}
-                  wheelReward={wheelReward}
+                  services={
+                    followersProducts
+                  }
+                  wheelReward={
+                    wheelReward
+                  }
                   onRewardUsed={
                     refreshReward
                   }
@@ -1100,12 +1446,12 @@ export function Subscriptions() {
 
                 <SocialSection
                   title="Views"
-                  services={socialProducts.filter(
-                    (product) =>
-                      product.type ===
-                      "views"
-                  )}
-                  wheelReward={wheelReward}
+                  services={
+                    viewsProducts
+                  }
+                  wheelReward={
+                    wheelReward
+                  }
                   onRewardUsed={
                     refreshReward
                   }
@@ -1113,12 +1459,12 @@ export function Subscriptions() {
 
                 <SocialSection
                   title="Likes"
-                  services={socialProducts.filter(
-                    (product) =>
-                      product.type ===
-                      "likes"
-                  )}
-                  wheelReward={wheelReward}
+                  services={
+                    likesProducts
+                  }
+                  wheelReward={
+                    wheelReward
+                  }
                   onRewardUsed={
                     refreshReward
                   }
