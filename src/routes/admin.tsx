@@ -418,42 +418,42 @@ function AdminPage() {
   ========================================================= */
 
   const toggleVisible = async (
-    slug: string
+    id: string
   ) => {
-    const product = products[slug];
+    const product = products[id];
 
     if (!product) {
       return;
     }
 
+    const nextActive = !product.active;
+
     try {
       await setProductActive(
-        slug,
-        !product.active
+        id,
+        nextActive
       );
 
-      setProducts((current) => ({
-        ...current,
-
-        [slug]: {
-          ...current[slug],
-
-          active:
-            !current[slug].active,
+      setProducts((previous) => ({
+        ...previous,
+        [id]: {
+          ...previous[id],
+          active: nextActive,
         },
       }));
     } catch (error) {
       console.error(
-        "Erreur changement visibilité:",
+        "Erreur changement visibilité produit:",
         error
       );
 
+      const message =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
       window.alert(
-        `Impossible de modifier la visibilité.\n\n${
-          error instanceof Error
-            ? error.message
-            : "Erreur inconnue"
-        }`
+        `Impossible de modifier la visibilité.\n\n${message}`
       );
     }
   };
