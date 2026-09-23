@@ -8,6 +8,7 @@ import {
   getSocialProducts,
   type SocialProduct,
 } from "@/lib/socialProducts";
+
 import {
   ArrowRight,
   Film,
@@ -15,6 +16,7 @@ import {
   Gift,
   Sparkles,
 } from "lucide-react";
+
 import { Button } from "../ui/button";
 import { Link } from "@tanstack/react-router";
 
@@ -38,6 +40,7 @@ type Plan = {
   accent: string;
   rewardDiscount: number;
 };
+
 type SocialService = SocialProduct;
 
 const baseCategories = [
@@ -139,25 +142,34 @@ function addSocialToCart(
   const cart = getStoredCart();
   const productName = `${service.name} (${type})`;
 
-  const rewardCanBeUsed = isRewardCompatible(reward, productName);
+  const rewardCanBeUsed = isRewardCompatible(
+    reward,
+    productName
+  );
 
   const finalPrice =
     rewardCanBeUsed && reward
-      ? calculateRewardPrice(service.price, reward.percentage)
+      ? calculateRewardPrice(
+          service.price,
+          reward.percentage
+        )
       : service.price;
 
- const slug = `social-${type}-${service.name}`
-  .toLowerCase()
-  .replace(/\s+/g, "-");
+  const slug = `social-${type}-${service.name}`
+    .toLowerCase()
+    .replace(/\s+/g, "-");
 
-  const existingItem = cart.find((item) => item.slug === slug);
+  const existingItem = cart.find(
+    (item) => item.slug === slug
+  );
 
   const updatedCart = existingItem
     ? cart.map((item) =>
         item.slug === slug
           ? {
               ...item,
-              quantity: Number(item.quantity ?? 0) + 1,
+              quantity:
+                Number(item.quantity ?? 0) + 1,
             }
           : item
       )
@@ -181,20 +193,25 @@ function addSocialToCart(
         },
       ];
 
-  localStorage.setItem("cart", JSON.stringify(updatedCart));
+  localStorage.setItem(
+    "cart",
+    JSON.stringify(updatedCart)
+  );
 
   if (rewardCanBeUsed) {
     consumeWheelReward(productName);
     onRewardUsed();
   }
 
-  window.dispatchEvent(new Event("cart-updated"));
+  window.dispatchEvent(
+    new Event("cart-updated")
+  );
 
   window.alert(
-  rewardCanBeUsed && reward
-    ? `Produit ajouté avec l'offre : ${reward.label}`
-    : "Added to cart ✅"
-);
+    rewardCanBeUsed && reward
+      ? `Produit ajouté avec l'offre : ${reward.label}`
+      : "Produit ajouté au panier ✅"
+  );
 }
 
 function SocialSection({
@@ -208,20 +225,28 @@ function SocialSection({
   wheelReward: WheelReward | null;
   onRewardUsed: () => void;
 }) {
+  if (services.length === 0) {
+    return null;
+  }
+
   return (
     <div className="mt-16">
       <h3 className="mb-6 font-display text-3xl font-bold">
-        {title} <span className="gradient-text">Packages</span>
+        {title}{" "}
+        <span className="gradient-text">
+          Packages
+        </span>
       </h3>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {services.map((service) => {
           const productName = `${service.name} (${title})`;
 
-          const rewardCanBeUsed = isRewardCompatible(
-            wheelReward,
-            productName
-          );
+          const rewardCanBeUsed =
+            isRewardCompatible(
+              wheelReward,
+              productName
+            );
 
           const displayedPrice =
             rewardCanBeUsed && wheelReward
@@ -233,7 +258,7 @@ function SocialSection({
 
           return (
             <article
-              key={service.name}
+              key={`${title}-${service.name}`}
               className="group relative overflow-hidden rounded-3xl p-6 gradient-border hover-lift"
             >
               <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl transition group-hover:bg-accent/20" />
@@ -251,7 +276,9 @@ function SocialSection({
                   )}
                 </div>
 
-                <h4 className="text-xl font-bold">{service.name}</h4>
+                <h4 className="text-xl font-bold">
+                  {service.name}
+                </h4>
 
                 <p className="mt-3 min-h-[48px] text-sm leading-relaxed text-muted-foreground">
                   {service.desc}
@@ -299,69 +326,93 @@ function SocialSection({
 }
 
 export function Subscriptions() {
-  const [category, setCategory] = useState("All");
-  const [sortBy, setSortBy] = useState("recommended");
+  const [category, setCategory] =
+    useState("All");
 
-  const [adminProducts, setAdminProducts] = useState<
-    Record<string, Subscription>
-  >({});
+  const [sortBy, setSortBy] =
+    useState("recommended");
 
-  const [productsLoading, setProductsLoading] = useState(true);
-  const [productsError, setProductsError] = useState("");
+  const [adminProducts, setAdminProducts] =
+    useState<Record<string, Subscription>>({});
+
+  const [productsLoading, setProductsLoading] =
+    useState(true);
+
+  const [productsError, setProductsError] =
+    useState("");
+
   const [socialProducts, setSocialProducts] =
-  useState<SocialProduct[]>([]);
+    useState<SocialProduct[]>([]);
 
-const [socialLoading, setSocialLoading] =
-  useState(true);
+  const [socialLoading, setSocialLoading] =
+    useState(true);
 
-const [socialError, setSocialError] =
-  useState("");
-  
+  const [socialError, setSocialError] =
+    useState("");
 
-  const [wheelReward, setWheelReward] = useState<WheelReward | null>(() => {
-    const reward = getWheelReward();
+  const [wheelReward, setWheelReward] =
+    useState<WheelReward | null>(() => {
+      const reward = getWheelReward();
 
-    return reward && !reward.used ? reward : null;
-  });
+      return reward && !reward.used
+        ? reward
+        : null;
+    });
 
   const refreshReward = () => {
     const reward = getWheelReward();
 
-    setWheelReward(reward && !reward.used ? reward : null);
+    setWheelReward(
+      reward && !reward.used
+        ? reward
+        : null
+    );
   };
 
+  /*
+   * ================================
+   * PRODUITS CLASSIQUES
+   * ================================
+   */
   useEffect(() => {
     let mounted = true;
 
     const refreshProducts = async () => {
       try {
         if (mounted) {
+          setProductsLoading(true);
           setProductsError("");
         }
 
-        const loadedProducts = await getProducts();
+        const loadedProducts =
+          await getProducts();
+
+        if (!mounted) {
+          return;
+        }
+
+        setAdminProducts(
+          loadedProducts ?? {}
+        );
+      } catch (error) {
+        console.error(
+          "Erreur chargement produits :",
+          error
+        );
 
         if (mounted) {
-          setAdminProducts(loadedProducts);
+          const message =
+            error instanceof Error
+              ? error.message
+              : String(error);
+
+          setProductsError(
+            `Impossible de charger les produits. ${
+              message || ""
+            }`
+          );
         }
-      } catch (error) {
-  console.error(
-    "Erreur chargement produits sociaux:",
-    error
-  );
-
-  if (mounted) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : String(error);
-
-    setSocialError(
-      `Erreur Supabase : ${message}`
-    );
-  }
-}
-     finally {
+      } finally {
         if (mounted) {
           setProductsLoading(false);
         }
@@ -370,67 +421,113 @@ const [socialError, setSocialError] =
 
     void refreshProducts();
 
-    const unsubscribe = subscribeToProducts(() => {
-      void refreshProducts();
-    });
+    const unsubscribe =
+      subscribeToProducts(() => {
+        void refreshProducts();
+      });
 
     return () => {
       mounted = false;
       unsubscribe();
     };
   }, []);
+
+  /*
+   * ================================
+   * PRODUITS SOCIAUX
+   * ================================
+   */
   useEffect(() => {
-  let mounted = true;
+    let mounted = true;
 
-  const refreshSocialProducts = async () => {
-    try {
-      setSocialLoading(true);
-      setSocialError("");
+    const refreshSocialProducts =
+      async () => {
+        try {
+          if (mounted) {
+            setSocialLoading(true);
+            setSocialError("");
+          }
 
-      const loadedSocialProducts =
-        await getSocialProducts();
+          const loadedSocialProducts =
+            await getSocialProducts();
 
-      if (mounted) {
-        setSocialProducts(
-          loadedSocialProducts.filter(
-            (product) => product.active
-          )
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Erreur chargement produits sociaux:",
-        error
-      );
+          console.log(
+            "Produits sociaux reçus :",
+            loadedSocialProducts
+          );
 
-      if (mounted) {
-        setSocialError(
-          "Impossible de charger les produits sociaux."
-        );
-      }
-    } finally {
-      if (mounted) {
-        setSocialLoading(false);
-      }
-    }
-  };
+          if (!mounted) {
+            return;
+          }
 
-  void refreshSocialProducts();
+          const validProducts =
+            Array.isArray(
+              loadedSocialProducts
+            )
+              ? loadedSocialProducts
+              : [];
 
-  return () => {
-    mounted = false;
-  };
-}, []);
+          setSocialProducts(
+            validProducts.filter(
+              (product) =>
+                product &&
+                product.active === true
+            )
+          );
+        } catch (error) {
+          console.error(
+            "Erreur chargement produits sociaux :",
+            error
+          );
 
-  useEffect(() => {
-    const handleCategorySelected = () => {
-      const selected = localStorage.getItem("selectedCategory");
+          if (mounted) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : String(error);
 
-      if (selected) {
-        setCategory(selected);
-        setSortBy("recommended");
-      }
+            setSocialError(
+              `Impossible de charger les produits sociaux.${
+                message
+                  ? ` ${message}`
+                  : ""
+              }`
+            );
+
+            setSocialProducts([]);
+          }
+        } finally {
+          if (mounted) {
+            setSocialLoading(false);
+          }
+        }
+      };
+
+    void refreshSocialProducts();
+
+    return () => {
+      mounted = false;
     };
+  }, []);
+
+  /*
+   * ================================
+   * CATEGORY
+   * ================================
+   */
+  useEffect(() => {
+    const handleCategorySelected =
+      () => {
+        const selected =
+          localStorage.getItem(
+            "selectedCategory"
+          );
+
+        if (selected) {
+          setCategory(selected);
+          setSortBy("recommended");
+        }
+      };
 
     handleCategorySelected();
 
@@ -447,11 +544,23 @@ const [socialError, setSocialError] =
     };
   }, []);
 
+  /*
+   * ================================
+   * WHEEL REWARD
+   * ================================
+   */
   useEffect(() => {
     refreshReward();
 
-    window.addEventListener("wheel-reward-updated", refreshReward);
-    window.addEventListener("storage", refreshReward);
+    window.addEventListener(
+      "wheel-reward-updated",
+      refreshReward
+    );
+
+    window.addEventListener(
+      "storage",
+      refreshReward
+    );
 
     return () => {
       window.removeEventListener(
@@ -459,93 +568,176 @@ const [socialError, setSocialError] =
         refreshReward
       );
 
-      window.removeEventListener("storage", refreshReward);
+      window.removeEventListener(
+        "storage",
+        refreshReward
+      );
     };
   }, []);
 
+  /*
+   * ================================
+   * CATEGORIES
+   * ================================
+   */
   const categories = useMemo(() => {
-    const productCategories = Object.values(adminProducts)
-      .map((product) => product.category)
-      .filter(
-        (productCategory): productCategory is string =>
-          typeof productCategory === "string" &&
-          productCategory.trim().length > 0
-      );
+    const productCategories =
+      Object.values(adminProducts)
+        .map(
+          (product) =>
+            product.category
+        )
+        .filter(
+          (
+            productCategory
+          ): productCategory is string =>
+            typeof productCategory ===
+              "string" &&
+            productCategory.trim()
+              .length > 0
+        );
 
-    return [...new Set([...baseCategories, ...productCategories])];
+    return [
+      ...new Set([
+        ...baseCategories,
+        ...productCategories,
+      ]),
+    ];
   }, [adminProducts]);
 
-  const filteredPlans = useMemo<Plan[]>(() => {
-    const result = Object.entries(adminProducts)
-      .filter(([, product]) => product.active)
-      .map(([slug, product]) => {
-        const originalPrice = parsePrice(
-          product.pricesByDuration?.["1 month"]
+  /*
+   * ================================
+   * FILTERED PLANS
+   * ================================
+   */
+  const filteredPlans =
+    useMemo<Plan[]>(() => {
+      const result = Object.entries(
+        adminProducts
+      )
+        .filter(
+          ([, product]) =>
+            product.active
+        )
+        .map(
+          ([slug, product]) => {
+            const originalPrice =
+              parsePrice(
+                product
+                  .pricesByDuration?.[
+                  "1 month"
+                ]
+              );
+
+            const oldPrice =
+              parsePrice(
+                product.oldPrice
+              );
+
+            const rewardCanBeUsed =
+              isRewardCompatible(
+                wheelReward,
+                product.name
+              );
+
+            const rewardDiscount =
+              rewardCanBeUsed &&
+              wheelReward
+                ? wheelReward.percentage
+                : 0;
+
+            return {
+              name: product.name,
+              slug,
+              category:
+                product.category,
+              icon: Film,
+              price:
+                rewardCanBeUsed
+                  ? calculateRewardPrice(
+                      originalPrice,
+                      rewardDiscount
+                    )
+                  : originalPrice,
+              originalPrice,
+              oldPrice,
+              duration:
+                product.duration ||
+                "1 month",
+              accent:
+                "from-primary to-accent",
+              rewardDiscount,
+            };
+          }
+        )
+        .filter(
+          (plan) =>
+            category === "All" ||
+            plan.category === category
         );
 
-        const oldPrice = parsePrice(product.oldPrice);
+      return [...result].sort(
+        (a, b) => {
+          if (
+            sortBy === "price-low"
+          ) {
+            return a.price - b.price;
+          }
 
-        const rewardCanBeUsed = isRewardCompatible(
-          wheelReward,
-          product.name
-        );
+          if (
+            sortBy === "price-high"
+          ) {
+            return b.price - a.price;
+          }
 
-        const rewardDiscount =
-          rewardCanBeUsed && wheelReward
-            ? wheelReward.percentage
-            : 0;
+          if (
+            sortBy === "discount"
+          ) {
+            const discountA =
+              a.oldPrice > 0
+                ? 1 -
+                  a.price /
+                    a.oldPrice
+                : 0;
 
-        return {
-          name: product.name,
-          slug,
-          category: product.category,
-          icon: Film,
-          price: rewardCanBeUsed
-            ? calculateRewardPrice(originalPrice, rewardDiscount)
-            : originalPrice,
-          originalPrice,
-          oldPrice,
-          duration: product.duration || "1 month",
-          accent: "from-primary to-accent",
-          rewardDiscount,
-        };
-      })
-      .filter(
-        (plan) => category === "All" || plan.category === category
+            const discountB =
+              b.oldPrice > 0
+                ? 1 -
+                  b.price /
+                    b.oldPrice
+                : 0;
+
+            return (
+              discountB -
+              discountA
+            );
+          }
+
+          if (sortBy === "name") {
+            return a.name.localeCompare(
+              b.name
+            );
+          }
+
+          return 0;
+        }
       );
-
-    return [...result].sort((a, b) => {
-      if (sortBy === "price-low") {
-        return a.price - b.price;
-      }
-
-      if (sortBy === "price-high") {
-        return b.price - a.price;
-      }
-
-      if (sortBy === "discount") {
-        const discountA =
-          a.oldPrice > 0 ? 1 - a.price / a.oldPrice : 0;
-
-        const discountB =
-          b.oldPrice > 0 ? 1 - b.price / b.oldPrice : 0;
-
-        return discountB - discountA;
-      }
-
-      if (sortBy === "name") {
-        return a.name.localeCompare(b.name);
-      }
-
-      return 0;
-    });
-  }, [adminProducts, category, sortBy, wheelReward]);
+    }, [
+      adminProducts,
+      category,
+      sortBy,
+      wheelReward,
+    ]);
 
   const hasActiveFilters =
-    category !== "All" || sortBy !== "recommended";
+    category !== "All" ||
+    sortBy !== "recommended";
 
   const resetFilters = () => {
-    localStorage.removeItem("selectedCategory");
+    localStorage.removeItem(
+      "selectedCategory"
+    );
+
     setCategory("All");
     setSortBy("recommended");
   };
@@ -556,6 +748,10 @@ const [socialError, setSocialError] =
       className="relative overflow-hidden py-24"
     >
       <div className="container relative z-10 mx-auto px-6">
+
+        {/* =========================
+            HEADER
+        ========================== */}
         <div className="mx-auto mb-12 max-w-2xl text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-primary glass">
             <Flame className="h-3.5 w-3.5" />
@@ -564,14 +760,20 @@ const [socialError, setSocialError] =
 
           <h2 className="mb-4 font-display text-4xl font-bold md:text-5xl">
             Featured{" "}
-            <span className="gradient-text">Subscriptions</span>
+            <span className="gradient-text">
+              Subscriptions
+            </span>
           </h2>
 
           <p className="text-muted-foreground">
-            Hand-picked premium services at the best local prices.
+            Hand-picked premium services at
+            the best local prices.
           </p>
         </div>
 
+        {/* =========================
+            WHEEL REWARD
+        ========================== */}
         {wheelReward && (
           <div className="mx-auto mb-10 max-w-4xl overflow-hidden rounded-3xl border border-primary/30 bg-primary/10 p-6 shadow-lg">
             <div className="flex flex-col items-center gap-4 text-center md:flex-row md:text-left">
@@ -593,7 +795,8 @@ const [socialError, setSocialError] =
                 </h3>
 
                 <p className="mt-1 text-sm text-muted-foreground">
-                  L'offre sera appliquée une seule fois au premier produit
+                  L'offre sera appliquée une
+                  seule fois au premier produit
                   compatible ajouté au panier.
                 </p>
               </div>
@@ -601,6 +804,9 @@ const [socialError, setSocialError] =
           </div>
         )}
 
+        {/* =========================
+            FILTERS
+        ========================== */}
         <div className="mx-auto mb-10 max-w-6xl rounded-3xl p-4 glass">
           <div className="mb-4 flex flex-wrap gap-2">
             {categories.map((item) => (
@@ -608,7 +814,10 @@ const [socialError, setSocialError] =
                 key={item}
                 type="button"
                 onClick={() => {
-                  localStorage.removeItem("selectedCategory");
+                  localStorage.removeItem(
+                    "selectedCategory"
+                  );
+
                   setCategory(item);
                 }}
                 className={`rounded-full px-4 py-2 text-sm transition-smooth ${
@@ -624,25 +833,41 @@ const [socialError, setSocialError] =
 
           <div className="flex flex-wrap gap-2">
             {[
-              ["recommended", "Recommended"],
-              ["price-low", "Low price"],
-              ["price-high", "High price"],
-              ["discount", "Best discount"],
+              [
+                "recommended",
+                "Recommended",
+              ],
+              [
+                "price-low",
+                "Low price",
+              ],
+              [
+                "price-high",
+                "High price",
+              ],
+              [
+                "discount",
+                "Best discount",
+              ],
               ["name", "A-Z"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setSortBy(value)}
-                className={`rounded-full px-3 py-1 text-xs transition-smooth ${
-                  sortBy === value
-                    ? "gradient-primary text-white"
-                    : "border border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+            ].map(
+              ([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() =>
+                    setSortBy(value)
+                  }
+                  className={`rounded-full px-3 py-1 text-xs transition-smooth ${
+                    sortBy === value
+                      ? "gradient-primary text-white"
+                      : "border border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            )}
           </div>
 
           {hasActiveFilters && (
@@ -656,6 +881,9 @@ const [socialError, setSocialError] =
           )}
         </div>
 
+        {/* =========================
+            NORMAL PRODUCTS
+        ========================== */}
         {productsLoading && (
           <div className="mx-auto mb-8 max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center text-muted-foreground">
             Chargement des produits...
@@ -672,139 +900,125 @@ const [socialError, setSocialError] =
           !productsError &&
           filteredPlans.length === 0 && (
             <div className="mx-auto mb-8 max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center">
-              <p className="font-semibold">Aucun produit disponible</p>
+              <p className="font-semibold">
+                Aucun produit disponible
+              </p>
 
               <p className="mt-2 text-sm text-muted-foreground">
-                Aucun produit actif ne correspond à cette catégorie.
+                Aucun produit actif ne
+                correspond à cette catégorie.
               </p>
             </div>
           )}
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {filteredPlans.map((plan) => {
-            const Icon = plan.icon;
+          {filteredPlans.map(
+            (plan) => {
+              const Icon = plan.icon;
 
-            return (
-              <article
-                key={plan.slug}
-                className="group relative overflow-hidden rounded-2xl p-6 gradient-border hover-lift"
-              >
-                <div className="pointer-events-none absolute inset-0 opacity-0 transition-smooth group-hover:opacity-100">
-                  <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
-                  <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-accent/10 blur-2xl" />
-                </div>
+              return (
+                <article
+                  key={plan.slug}
+                  className="group relative overflow-hidden rounded-2xl p-6 gradient-border hover-lift"
+                >
+                  <div className="pointer-events-none absolute inset-0 opacity-0 transition-smooth group-hover:opacity-100">
+                    <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
 
-                <div className="relative z-10">
-                  <div className="mb-5 flex items-start justify-between gap-3">
-                    <div
-                      className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${plan.accent} shadow-lg`}
-                    >
-                      <Icon className="h-6 w-6 text-primary-foreground" />
-                    </div>
-
-                    {plan.rewardDiscount > 0 && (
-                      <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-success">
-                        🎁 -{plan.rewardDiscount}%
-                      </span>
-                    )}
+                    <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-accent/10 blur-2xl" />
                   </div>
 
-                  <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                    {plan.category}
-                  </p>
-
-                  <h3 className="mb-3 min-h-[48px] font-display text-lg font-bold">
-                    {plan.name}
-                  </h3>
-
-                  {plan.rewardDiscount > 0 && (
-                    <div className="mb-3 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
-                      🎁 Offre roue disponible
-                    </div>
-                  )}
-
-                  <div className="mb-5">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      <strong>À partir de</strong>
-                    </span>
-
-                    <div className="mt-1 flex items-end gap-2">
-                      <div className="flex items-end gap-1">
-                        <span className="text-3xl font-bold gradient-text">
-                          {formatPrice(plan.price)}
-                        </span>
-
-                        <span className="mb-1 text-xl font-bold gradient-text">
-                          DT
-                        </span>
+                  <div className="relative z-10">
+                    <div className="mb-5 flex items-start justify-between gap-3">
+                      <div
+                        className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${plan.accent} shadow-lg`}
+                      >
+                        <Icon className="h-6 w-6 text-primary-foreground" />
                       </div>
 
-                      {plan.rewardDiscount > 0 && (
-                        <span className="mb-1 text-sm text-muted-foreground line-through">
-                          {formatPrice(plan.originalPrice)} DT
+                      {plan.rewardDiscount >
+                        0 && (
+                        <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-success">
+                          🎁 -
+                          {
+                            plan.rewardDiscount
+                          }
+                          %
                         </span>
                       )}
                     </div>
-                  </div>
 
-                  <Button
-                    asChild
-                    className="w-full border-0 gradient-primary text-primary-foreground"
-                  >
-                    <Link
-                      to="/subscription/$slug"
-                      params={{ slug: plan.slug }}
+                    <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
+                      {plan.category}
+                    </p>
+
+                    <h3 className="mb-3 min-h-[48px] font-display text-lg font-bold">
+                      {plan.name}
+                    </h3>
+
+                    {plan.rewardDiscount >
+                      0 && (
+                      <div className="mb-3 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
+                        🎁 Offre roue
+                        disponible
+                      </div>
+                    )}
+
+                    <div className="mb-5">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        <strong>
+                          À partir de
+                        </strong>
+                      </span>
+
+                      <div className="mt-1 flex items-end gap-2">
+                        <div className="flex items-end gap-1">
+                          <span className="text-3xl font-bold gradient-text">
+                            {formatPrice(
+                              plan.price
+                            )}
+                          </span>
+
+                          <span className="mb-1 text-xl font-bold gradient-text">
+                            DT
+                          </span>
+                        </div>
+
+                        {plan.rewardDiscount >
+                          0 && (
+                          <span className="mb-1 text-sm text-muted-foreground line-through">
+                            {formatPrice(
+                              plan.originalPrice
+                            )}{" "}
+                            DT
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button
+                      asChild
+                      className="w-full border-0 gradient-primary text-primary-foreground"
                     >
-                      Voir détails
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
-              </article>
-            );
-          })}
+                      <Link
+                        to="/subscription/$slug"
+                        params={{
+                          slug: plan.slug,
+                        }}
+                      >
+                        Voir détails
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </article>
+              );
+            }
+          )}
         </div>
-{socialLoading ? (
-  <div className="mt-10 rounded-2xl border border-border bg-card/50 p-6 text-center text-muted-foreground">
-    Chargement des produits sociaux...
-  </div>
-) : socialError ? (
-  <div className="mt-10 rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center text-destructive">
-    {socialError}
-  </div>
-) : (
-  <>
-    <SocialSection
-      title="Followers"
-      services={socialProducts.filter(
-        (product) =>
-          product.type === "followers"
-      )}
-      wheelReward={wheelReward}
-      onRewardUsed={refreshReward}
-    />
 
-    <SocialSection
-      title="Views"
-      services={socialProducts.filter(
-        (product) =>
-          product.type === "views"
-      )}
-      wheelReward={wheelReward}
-      onRewardUsed={refreshReward}
-    />
-
-    <SocialSection
-      title="Likes"
-      services={socialProducts.filter(
-        (product) =>
-          product.type === "likes"
-      )}
-      wheelReward={wheelReward}
-      onRewardUsed={refreshReward}
-    />
-  </>
-)}
+        {/* =========================
+            SOCIAL BOOST
+        ========================== */}
         <div className="mt-24">
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-primary glass">
@@ -813,15 +1027,90 @@ const [socialError, setSocialError] =
 
             <h2 className="mb-4 font-display text-4xl font-bold md:text-5xl">
               Boost Your{" "}
-              <span className="gradient-text">Social Media</span>
+              <span className="gradient-text">
+                Social Media
+              </span>
             </h2>
 
             <p className="text-muted-foreground">
-              Choose followers, views or likes packages separately.
+              Choose followers, views or likes
+              packages separately.
             </p>
           </div>
 
-         
+          {socialLoading && (
+            <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center text-muted-foreground">
+              Chargement des produits sociaux...
+            </div>
+          )}
+
+          {socialError && (
+            <div className="mx-auto max-w-2xl rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center text-destructive">
+              {socialError}
+            </div>
+          )}
+
+          {!socialLoading &&
+            !socialError &&
+            socialProducts.length === 0 && (
+              <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center">
+                <p className="font-semibold">
+                  Aucun produit social
+                  disponible
+                </p>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Aucun produit social actif
+                  n'est disponible pour le
+                  moment.
+                </p>
+              </div>
+            )}
+
+          {!socialLoading &&
+            !socialError &&
+            socialProducts.length > 0 && (
+              <>
+                <SocialSection
+                  title="Followers"
+                  services={socialProducts.filter(
+                    (product) =>
+                      product.type ===
+                      "followers"
+                  )}
+                  wheelReward={wheelReward}
+                  onRewardUsed={
+                    refreshReward
+                  }
+                />
+
+                <SocialSection
+                  title="Views"
+                  services={socialProducts.filter(
+                    (product) =>
+                      product.type ===
+                      "views"
+                  )}
+                  wheelReward={wheelReward}
+                  onRewardUsed={
+                    refreshReward
+                  }
+                />
+
+                <SocialSection
+                  title="Likes"
+                  services={socialProducts.filter(
+                    (product) =>
+                      product.type ===
+                      "likes"
+                  )}
+                  wheelReward={wheelReward}
+                  onRewardUsed={
+                    refreshReward
+                  }
+                />
+              </>
+            )}
         </div>
       </div>
     </section>
