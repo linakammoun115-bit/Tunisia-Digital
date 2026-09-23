@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase";
 
 export type DurationKey =
   | "1 month"
+  | "2 months"
+  | "3 months"
   | "6 months"
   | "1 year";
 
@@ -34,13 +36,16 @@ type ProductRow = {
   description: string | null;
   features: unknown;
   active: boolean | null;
+
   price_1_month: string | number | null;
+  price_2_months: string | number | null;
+  price_3_months: string | number | null;
   price_6_months: string | number | null;
   price_1_year: string | number | null;
+
   position: number | null;
   updated_at?: string | null;
 };
-
 /* =========================================================
    HELPERS
 ========================================================= */
@@ -48,6 +53,14 @@ type ProductRow = {
 function normalizeDuration(
   duration: unknown
 ): DurationKey {
+  if (duration === "2 months") {
+    return "2 months";
+  }
+
+  if (duration === "3 months") {
+    return "3 months";
+  }
+
   if (duration === "6 months") {
     return "6 months";
   }
@@ -58,7 +71,6 @@ function normalizeDuration(
 
   return "1 month";
 }
-
 function normalizeFeatures(
   features: unknown
 ): string[] {
@@ -162,23 +174,32 @@ function rowToSubscription(
     active:
       row.active ?? true,
 
-    pricesByDuration: {
-      "1 month":
-        normalizePrice(
-          row.price_1_month
-        ),
+   pricesByDuration: {
+  "1 month":
+    normalizePrice(
+      row.price_1_month
+    ),
 
-      "6 months":
-        normalizePrice(
-          row.price_6_months
-        ),
+  "2 months":
+    normalizePrice(
+      row.price_2_months
+    ),
 
-      "1 year":
-        normalizePrice(
-          row.price_1_year
-        ),
-    },
-  };
+  "3 months":
+    normalizePrice(
+      row.price_3_months
+    ),
+
+  "6 months":
+    normalizePrice(
+      row.price_6_months
+    ),
+
+  "1 year":
+    normalizePrice(
+      row.price_1_year
+    ),
+},  };
 }
 
 /* =========================================================
@@ -224,6 +245,18 @@ function subscriptionToRow(
           "1 month"
         ]
       ),
+     price_2_months:
+  priceToDatabase(
+    product.pricesByDuration?.[
+      "2 months"
+    ]
+  ),
+     price_3_months:
+  priceToDatabase(
+    product.pricesByDuration?.[
+      "3 months"
+    ]
+  ),
 
     price_6_months:
       priceToDatabase(
