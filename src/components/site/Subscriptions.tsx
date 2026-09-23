@@ -5,6 +5,10 @@ import {
   type Subscription,
 } from "@/lib/products";
 import {
+  getSocialProducts,
+  type SocialProduct,
+} from "@/lib/socialProducts";
+import {
   ArrowRight,
   Film,
   Flame,
@@ -34,71 +38,7 @@ type Plan = {
   accent: string;
   rewardDiscount: number;
 };
-
-type SocialService = {
-  name: string;
-  price: number;
-  desc: string;
-};
-
-const followersServices: SocialService[] = [
-  {
-    name: "1K Followers",
-    price: 10,
-    desc: "Ideal for starting and giving your profile more credibility.",
-  },
-  {
-    name: "2K Followers",
-    price: 15,
-    desc: "A stronger boost for personal pages and small businesses.",
-  },
-  {
-    name: "10K Followers",
-    price: 70,
-    desc: "Perfect for influencers, creators and growing brands.",
-  },
-  {
-    name: "20K Followers",
-    price: 120,
-    desc: "High-impact growth package for serious social presence.",
-  },
-  {
-    name: "100K Followers",
-    price: 500,
-    desc: "Maximum visibility package for big pages and campaigns.",
-  },
-];
-
-const viewsServices: SocialService[] = [
-  {
-    name: "100K Views",
-    price: 40,
-    desc: "Boost your video reach and increase visibility quickly.",
-  },
-  {
-    name: "1 Million Views",
-    price: 120,
-    desc: "Massive exposure package for viral content and campaigns.",
-  },
-];
-
-const likesServices: SocialService[] = [
-  {
-    name: "1K Likes",
-    price: 20,
-    desc: "Improve post engagement and make your content look active.",
-  },
-  {
-    name: "10K Likes",
-    price: 100,
-    desc: "Great for campaigns, launches and high-performing posts.",
-  },
-  {
-    name: "100K Likes",
-    price: 300,
-    desc: "Premium engagement package for large-scale visibility.",
-  },
-];
+type SocialService = SocialProduct;
 
 const baseCategories = [
   "All",
@@ -197,7 +137,7 @@ function addSocialToCart(
   onRewardUsed: () => void
 ): void {
   const cart = getStoredCart();
-  const productName = '${service.name} (${type})';
+  const productName = `${service.name} (${type})`;
 
   const rewardCanBeUsed = isRewardCompatible(reward, productName);
 
@@ -206,9 +146,9 @@ function addSocialToCart(
       ? calculateRewardPrice(service.price, reward.percentage)
       : service.price;
 
-  const slug = 'social-${type}-${service.name}'
-    .toLowerCase()
-    .replace(/\s+/g, "-");
+ const slug = `social-${type}-${service.name}`
+  .toLowerCase()
+  .replace(/\s+/g, "-");
 
   const existingItem = cart.find((item) => item.slug === slug);
 
@@ -368,6 +308,15 @@ export function Subscriptions() {
 
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
+  const [socialProducts, setSocialProducts] =
+  useState<SocialProduct[]>([]);
+
+const [socialLoading, setSocialLoading] =
+  useState(true);
+
+const [socialError, setSocialError] =
+  useState("");
+  
 
   const [wheelReward, setWheelReward] = useState<WheelReward | null>(() => {
     const reward = getWheelReward();
@@ -421,6 +370,48 @@ export function Subscriptions() {
       unsubscribe();
     };
   }, []);
+  useEffect(() => {
+  let mounted = true;
+
+  const refreshSocialProducts = async () => {
+    try {
+      setSocialLoading(true);
+      setSocialError("");
+
+      const loadedSocialProducts =
+        await getSocialProducts();
+
+      if (mounted) {
+        setSocialProducts(
+          loadedSocialProducts.filter(
+            (product) => product.active
+          )
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Erreur chargement produits sociaux:",
+        error
+      );
+
+      if (mounted) {
+        setSocialError(
+          "Impossible de charger les produits sociaux."
+        );
+      }
+    } finally {
+      if (mounted) {
+        setSocialLoading(false);
+      }
+    }
+  };
+
+  void refreshSocialProducts();
+
+  return () => {
+    mounted = false;
+  };
+}, []);
 
   useEffect(() => {
     const handleCategorySelected = () => {
@@ -764,7 +755,47 @@ export function Subscriptions() {
             );
           })}
         </div>
+{socialLoading ? (
+  <div className="mt-10 rounded-2xl border border-border bg-card/50 p-6 text-center text-muted-foreground">
+    Chargement des produits sociaux...
+  </div>
+) : socialError ? (
+  <div className="mt-10 rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center text-destructive">
+    {socialError}
+  </div>
+) : (
+  <>
+    <SocialSection
+      title="Followers"
+      services={socialProducts.filter(
+        (product) =>
+          product.type === "followers"
+      )}
+      wheelReward={wheelReward}
+      onRewardUsed={refreshReward}
+    />
 
+    <SocialSection
+      title="Views"
+      services={socialProducts.filter(
+        (product) =>
+          product.type === "views"
+      )}
+      wheelReward={wheelReward}
+      onRewardUsed={refreshReward}
+    />
+
+    <SocialSection
+      title="Likes"
+      services={socialProducts.filter(
+        (product) =>
+          product.type === "likes"
+      )}
+      wheelReward={wheelReward}
+      onRewardUsed={refreshReward}
+    />
+  </>
+)}
         <div className="mt-24">
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-primary glass">
@@ -781,26 +812,7 @@ export function Subscriptions() {
             </p>
           </div>
 
-          <SocialSection
-            title="Followers"
-            services={followersServices}
-            wheelReward={wheelReward}
-            onRewardUsed={refreshReward}
-          />
-
-          <SocialSection
-            title="Views"
-            services={viewsServices}
-            wheelReward={wheelReward}
-            onRewardUsed={refreshReward}
-          />
-
-          <SocialSection
-            title="Likes"
-            services={likesServices}
-            wheelReward={wheelReward}
-            onRewardUsed={refreshReward}
-          />
+         
         </div>
       </div>
     </section>
