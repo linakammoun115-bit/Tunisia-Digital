@@ -401,56 +401,139 @@ const durationOptions: {
 
 function SubscriptionDetails() {
   const { slug } = Route.useParams();
-
   const navigate = useNavigate();
 
-  const products = getProducts();
+  const [products, setProducts] = useState<
+    Record<string, Subscription>
+  >({});
 
-  /* ---------------------------------------------------------
-     FIND PRODUCT
-  --------------------------------------------------------- */
+  const [productsLoading, setProductsLoading] =
+    useState(true);
 
-  const subscription: Subscription | undefined =
-    Array.isArray(products)
-      ? products.find(
-          (product: Subscription & {
-            slug?: string;
-          }) => product.slug === slug
-        )
-      : (
-          products as Record<
-            string,
-            Subscription
-          >
-        )[slug];
-
-  /* ---------------------------------------------------------
-     SELECTED DURATION
-  --------------------------------------------------------- */
+  const [productsError, setProductsError] =
+    useState<string | null>(null);
 
   const [selectedDuration, setSelectedDuration] =
     useState<DurationKey>("1 month");
 
-  /* ---------------------------------------------------------
-     PRODUCT NOT FOUND
-  --------------------------------------------------------- */
+  /* =========================================================
+     LOAD PRODUCTS
+  ========================================================= */
 
-  if (!subscription) {
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProducts = async () => {
+      try {
+        setProductsLoading(true);
+        setProductsError(null);
+
+        const loadedProducts = await getProducts();
+
+        if (cancelled) {
+          return;
+        }
+
+        /*
+         * getProducts() retourne :
+         *
+         * {
+         *   "ID_SUPABASE": {
+         *      name: "...",
+         *      ...
+         *   }
+         * }
+         *
+         * Le slug de l'URL doit donc être l'ID Supabase.
+         */
+
+        setProducts(
+          loadedProducts as Record<
+            string,
+            Subscription
+          >
+        );
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error(
+          "Erreur chargement produits:",
+          error
+        );
+
+        setProductsError(
+          error instanceof Error
+            ? error.message
+            : String(error)
+        );
+      } finally {
+        if (!cancelled) {
+          setProductsLoading(false);
+        }
+      }
+    };
+
+    void loadProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* =========================================================
+     PRODUCT
+  ========================================================= */
+
+  const subscription =
+    products[slug];
+
+  /* =========================================================
+     LOADING
+  ========================================================= */
+
+  if (productsLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+        <div className="gradient-border rounded-3xl p-8 text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+
+          <h1 className="text-xl font-bold">
+            Chargement du produit...
+          </h1>
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            Veuillez patienter.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /* =========================================================
+     ERROR
+  ========================================================= */
+
+  if (productsError) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
         <div className="gradient-border max-w-md rounded-3xl p-8 text-center">
           <h1 className="mb-3 text-3xl font-bold">
-            Subscription not found
+            Erreur de chargement
           </h1>
 
           <p className="mb-6 text-sm text-muted-foreground">
-            This offer does not exist or may have
-            been removed.
+            Impossible de charger les produits.
+          </p>
+
+          <p className="mb-6 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
+            {productsError}
           </p>
 
           <Link to="/">
             <Button className="border-0 gradient-primary text-primary-foreground">
-              Back home
+              Retour à l'accueil
             </Button>
           </Link>
         </div>
@@ -458,9 +541,39 @@ function SubscriptionDetails() {
     );
   }
 
-  /* ---------------------------------------------------------
+  /* =========================================================
+     PRODUCT NOT FOUND
+  ========================================================= */
+
+  if (!subscription) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+        <div className="gradient-border max-w-md rounded-3xl p-8 text-center">
+          <h1 className="mb-3 text-3xl font-bold">
+            Produit introuvable
+          </h1>
+
+          <p className="mb-3 text-sm text-muted-foreground">
+            Ce produit n'existe pas ou a été supprimé.
+          </p>
+
+          <p className="mb-6 rounded-xl bg-muted p-3 text-xs text-muted-foreground break-all">
+            ID demandé : {slug}
+          </p>
+
+          <Link to="/">
+            <Button className="border-0 gradient-primary text-primary-foreground">
+              Retour à l'accueil
+            </Button>
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  /* =========================================================
      PRODUCT DISABLED
-  --------------------------------------------------------- */
+  ========================================================= */
 
   if (!subscription.active) {
     return (
@@ -476,7 +589,7 @@ function SubscriptionDetails() {
 
           <Link to="/">
             <Button>
-              Back home
+              Retour à l'accueil
             </Button>
           </Link>
         </div>
@@ -484,9 +597,9 @@ function SubscriptionDetails() {
     );
   }
 
-  /* ---------------------------------------------------------
+  /* =========================================================
      PRICES
-  --------------------------------------------------------- */
+  ========================================================= */
 
   const pricesByDuration: Record<
     DurationKey,
@@ -495,40 +608,34 @@ function SubscriptionDetails() {
     "1 month":
       subscription.pricesByDuration?.[
         "1 month"
-      ] ??
-      subscription.price ??
-      "0 DT",
+      ] ?? "0 DT",
 
     "2 months":
       subscription.pricesByDuration?.[
         "2 months"
-      ] ??
-      "0 DT",
+      ] ?? "0 DT",
 
     "3 months":
       subscription.pricesByDuration?.[
         "3 months"
-      ] ??
-      "0 DT",
+      ] ?? "0 DT",
 
     "6 months":
       subscription.pricesByDuration?.[
         "6 months"
-      ] ??
-      "0 DT",
+      ] ?? "0 DT",
 
     "1 year":
       subscription.pricesByDuration?.[
         "1 year"
-      ] ??
-      "0 DT",
+      ] ?? "0 DT",
   };
 
-  /* ---------------------------------------------------------
+  /* =========================================================
      AVAILABLE DURATIONS
      
-     0 DT = duration unavailable
-  --------------------------------------------------------- */
+     0 DT = durée indisponible
+  ========================================================= */
 
   const availableDurations =
     durationOptions.filter(
@@ -538,12 +645,9 @@ function SubscriptionDetails() {
         ) > 0
     );
 
-  /* ---------------------------------------------------------
+  /* =========================================================
      FIX SELECTED DURATION
-     
-     If current selected duration is unavailable,
-     automatically select the first available one.
-  --------------------------------------------------------- */
+  ========================================================= */
 
   useEffect(() => {
     if (
@@ -566,15 +670,17 @@ function SubscriptionDetails() {
       );
     }
   }, [
+    subscription,
     selectedDuration,
-    availableDurations,
   ]);
 
-  /* ---------------------------------------------------------
+  /* =========================================================
      NO AVAILABLE DURATION
-  --------------------------------------------------------- */
+  ========================================================= */
 
-  if (availableDurations.length === 0) {
+  if (
+    availableDurations.length === 0
+  ) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
         <div className="gradient-border max-w-md rounded-3xl p-8 text-center">
@@ -597,9 +703,9 @@ function SubscriptionDetails() {
     );
   }
 
-  /* ---------------------------------------------------------
+  /* =========================================================
      SELECTED PRICE
-  --------------------------------------------------------- */
+  ========================================================= */
 
   const selectedPriceText =
     pricesByDuration[
@@ -611,9 +717,9 @@ function SubscriptionDetails() {
       selectedPriceText
     );
 
-  /* ---------------------------------------------------------
+  /* =========================================================
      WHEEL REWARD
-  --------------------------------------------------------- */
+  ========================================================= */
 
   const reward =
     getWheelReward();
@@ -639,10 +745,10 @@ function SubscriptionDetails() {
   ========================================================= */
 
   const addToCart = () => {
-    /* -------------------------------------------------------
-       SECURITY CHECK
-       Prevent adding a 0 DT / unavailable duration
-    ------------------------------------------------------- */
+    /*
+     * Sécurité :
+     * impossible d'ajouter une durée à 0 DT.
+     */
 
     if (
       priceToNumber(
@@ -681,16 +787,21 @@ function SubscriptionDetails() {
     const cart =
       getCart();
 
-    const cartSlug = `${slug}-${selectedDuration.replaceAll(
-      " ",
-      "-"
-    )}`;
+    /*
+     * Chaque durée possède son propre article
+     * dans le panier.
+     */
+
+    const cartSlug =
+      `${slug}-${selectedDuration.replaceAll(
+        " ",
+        "-"
+      )}`;
 
     const existingItem =
       cart.find(
         (item) =>
-          item.slug ===
-          cartSlug
+          item.slug === cartSlug
       );
 
     const updatedCart: CartItem[] =
@@ -795,8 +906,6 @@ function SubscriptionDetails() {
       <div className="pointer-events-none fixed bottom-10 right-10 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl">
-        {/* BACK */}
-
         <Link
           to="/"
           className="mb-8 inline-flex items-center gap-2 rounded-full border border-border/70 px-4 py-2 text-sm text-muted-foreground transition-smooth hover:border-primary/40 hover:text-primary"
@@ -810,9 +919,7 @@ function SubscriptionDetails() {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-primary/5" />
 
           <div className="relative z-10 grid gap-10 lg:grid-cols-[1.25fr_0.75fr]">
-            {/* =================================================
-                LEFT
-            ================================================= */}
+            {/* LEFT */}
 
             <div>
               <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -880,13 +987,9 @@ function SubscriptionDetails() {
 
               <ul className="grid gap-4 sm:grid-cols-2">
                 {subscription.features.map(
-                  (
-                    feature: string
-                  ) => (
+                  (feature: string) => (
                     <li
-                      key={
-                        feature
-                      }
+                      key={feature}
                       className="flex items-start gap-3 text-sm"
                     >
                       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20">
@@ -894,9 +997,7 @@ function SubscriptionDetails() {
                       </span>
 
                       <span className="leading-relaxed text-muted-foreground">
-                        {
-                          feature
-                        }
+                        {feature}
                       </span>
                     </li>
                   )
@@ -904,9 +1005,7 @@ function SubscriptionDetails() {
               </ul>
             </div>
 
-            {/* =================================================
-                RIGHT
-            ================================================= */}
+            {/* RIGHT */}
 
             <aside className="glass h-fit rounded-3xl p-6 shadow-card">
               <p className="mb-2 text-sm text-muted-foreground">
@@ -939,9 +1038,7 @@ function SubscriptionDetails() {
                 reward && (
                   <div className="mb-5 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm font-bold text-success">
                     🎁{" "}
-                    {
-                      reward.label
-                    }{" "}
+                    {reward.label}{" "}
                     sera appliquée
                     dans le panier
                   </div>
@@ -977,9 +1074,7 @@ function SubscriptionDetails() {
                       >
                         <div className="flex items-center justify-between gap-3">
                           <span>
-                            {
-                              label
-                            }
+                            {label}
                           </span>
 
                           <strong>
@@ -999,9 +1094,7 @@ function SubscriptionDetails() {
               {/* ADD CART */}
 
               <Button
-                onClick={
-                  addToCart
-                }
+                onClick={addToCart}
                 className="h-12 w-full border-0 gradient-primary text-primary-foreground hover:opacity-90 glow-primary"
               >
                 <ShoppingCart className="mr-2 h-4 w-4" />
