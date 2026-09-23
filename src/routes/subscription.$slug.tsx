@@ -1,6 +1,10 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+} from "@tanstack/react-router";
 import { savePendingCart, getProducts } from "@/lib/products";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -16,6 +20,18 @@ import {
   canUseRewardOnProduct,
   getWheelReward,
 } from "@/lib/wheelReward";
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+type DurationKey =
+  | "1 month"
+  | "2 months"
+  | "3 months"
+  | "6 months"
+  | "1 year";
+
 type Subscription = {
   name: string;
   price: string;
@@ -25,11 +41,10 @@ type Subscription = {
   description: string;
   features: string[];
   active: boolean;
-  pricesByDuration?: {
-    "1 month": string;
-    "6 months": string;
-    "1 year": string;
-  };
+
+  pricesByDuration?: Partial<
+    Record<DurationKey, string>
+  >;
 };
 
 type CartItem = {
@@ -39,12 +54,17 @@ type CartItem = {
   originalPrice: number;
   duration: string;
   quantity: number;
+
   wheelReward?: {
     id: string;
     label: string;
     percentage: number;
   } | null;
 };
+
+/* =========================================================
+   ANCIENS PRODUITS / FALLBACK
+========================================================= */
 
 export const subscriptions = {
   "canva-pro": {
@@ -63,6 +83,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "chatgpt-business": {
     name: "ChatGPT Business",
     price: "30 DT",
@@ -79,6 +100,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "capcut-pro": {
     name: "CapCut Pro",
     price: "15 DT",
@@ -95,6 +117,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "adobe-creative-cloud-pro": {
     name: "Adobe Creative Cloud Pro",
     price: "40 DT",
@@ -111,6 +134,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "netflix-shared": {
     name: "Netflix Shared",
     price: "15 DT",
@@ -127,6 +151,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "netflix-private": {
     name: "Netflix Private",
     price: "35 DT",
@@ -143,6 +168,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "netflix-essential": {
     name: "Netflix Essential",
     price: "25 DT",
@@ -159,6 +185,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "iptv-dream-4k": {
     name: "IPTV Dream 4K",
     price: "90 DT",
@@ -175,13 +202,15 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "youtube-premium": {
     name: "YouTube Premium",
     price: "20 DT",
     oldPrice: "40 DT",
     duration: "1 month",
     category: "Streaming",
-    description: "Watch YouTube without ads and enjoy premium features.",
+    description:
+      "Watch YouTube without ads and enjoy premium features.",
     features: [
       "Ad-free YouTube",
       "Background play",
@@ -190,13 +219,15 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "spotify-premium": {
     name: "Spotify Premium",
     price: "40 DT",
     oldPrice: "70 DT",
     duration: "1 year",
     category: "Streaming",
-    description: "Enjoy unlimited music with Spotify Premium for one year.",
+    description:
+      "Enjoy unlimited music with Spotify Premium for one year.",
     features: [
       "1 year access",
       "Music premium",
@@ -205,13 +236,15 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "linkedin-career": {
     name: "LinkedIn Career",
     price: "50 DT",
     oldPrice: "90 DT",
     duration: "3 months",
     category: "Productivity",
-    description: "Boost your career with LinkedIn premium career tools.",
+    description:
+      "Boost your career with LinkedIn premium career tools.",
     features: [
       "3 months access",
       "Career insights",
@@ -220,6 +253,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "linkedin-business": {
     name: "LinkedIn Business",
     price: "100 DT",
@@ -236,6 +270,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "microsoft-office-professional-plus": {
     name: "Microsoft Office Professional Plus",
     price: "80 DT",
@@ -252,6 +287,7 @@ export const subscriptions = {
     ],
     active: true,
   },
+
   "coursera-plus": {
     name: "Coursera Plus",
     price: "90 DT",
@@ -270,21 +306,34 @@ export const subscriptions = {
   },
 } satisfies Record<string, Subscription>;
 
+/* =========================================================
+   ROUTE
+========================================================= */
+
 export const Route = createFileRoute("/subscription/$slug")({
   component: SubscriptionDetails,
 });
 
-function priceToNumber(price: string | number | undefined) {
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function priceToNumber(
+  price: string | number | undefined | null
+) {
   const normalized = String(price ?? "0")
     .replace(",", ".")
     .replace(/[^\d.]/g, "");
 
   const parsed = Number(normalized);
+
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function formatPrice(price: number) {
-  return Number.isInteger(price) ? String(price) : price.toFixed(2);
+  return Number.isInteger(price)
+    ? String(price)
+    : price.toFixed(2);
 }
 
 function getCart(): CartItem[] {
@@ -304,36 +353,101 @@ function getCart(): CartItem[] {
 }
 
 function saveCart(cart: CartItem[]) {
-  localStorage.setItem("cart", JSON.stringify(cart));
+  localStorage.setItem(
+    "cart",
+    JSON.stringify(cart)
+  );
+
   savePendingCart(cart);
-  window.dispatchEvent(new Event("cart-updated"));
+
+  window.dispatchEvent(
+    new Event("cart-updated")
+  );
 }
+
+/* =========================================================
+   DURATION OPTIONS
+========================================================= */
+
+const durationOptions: {
+  key: DurationKey;
+  label: string;
+}[] = [
+  {
+    key: "1 month",
+    label: "1 mois",
+  },
+  {
+    key: "2 months",
+    label: "2 mois",
+  },
+  {
+    key: "3 months",
+    label: "3 mois",
+  },
+  {
+    key: "6 months",
+    label: "6 mois",
+  },
+  {
+    key: "1 year",
+    label: "1 an",
+  },
+];
+
+/* =========================================================
+   PAGE
+========================================================= */
 
 function SubscriptionDetails() {
   const { slug } = Route.useParams();
+
   const navigate = useNavigate();
 
   const products = getProducts();
 
-  const subscription: Subscription | undefined = Array.isArray(products)
-    ? products.find(
-        (product: Subscription & { slug?: string }) =>
-          product.slug === slug
-      )
-    : (products as Record<string, Subscription>)[slug];
+  /* ---------------------------------------------------------
+     FIND PRODUCT
+  --------------------------------------------------------- */
 
-  const [selectedDuration, setSelectedDuration] = useState<
-    "1 month" | "6 months" | "1 year"
-  >("1 month");
+  const subscription: Subscription | undefined =
+    Array.isArray(products)
+      ? products.find(
+          (product: Subscription & {
+            slug?: string;
+          }) => product.slug === slug
+        )
+      : (
+          products as Record<
+            string,
+            Subscription
+          >
+        )[slug];
+
+  /* ---------------------------------------------------------
+     SELECTED DURATION
+  --------------------------------------------------------- */
+
+  const [selectedDuration, setSelectedDuration] =
+    useState<DurationKey>("1 month");
+
+  /* ---------------------------------------------------------
+     PRODUCT NOT FOUND
+  --------------------------------------------------------- */
 
   if (!subscription) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
         <div className="gradient-border max-w-md rounded-3xl p-8 text-center">
-          <h1 className="mb-3 text-3xl font-bold">Subscription not found</h1>
+          <h1 className="mb-3 text-3xl font-bold">
+            Subscription not found
+          </h1>
+
           <p className="mb-6 text-sm text-muted-foreground">
-            This offer does not exist or may have been removed.
+            This offer does not exist or may have
+            been removed.
           </p>
+
           <Link to="/">
             <Button className="border-0 gradient-primary text-primary-foreground">
               Back home
@@ -344,129 +458,351 @@ function SubscriptionDetails() {
     );
   }
 
+  /* ---------------------------------------------------------
+     PRODUCT DISABLED
+  --------------------------------------------------------- */
+
   if (!subscription.active) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
         <div className="gradient-border max-w-md rounded-3xl p-8 text-center">
-          <h1 className="mb-3 text-3xl font-bold">Produit indisponible</h1>
+          <h1 className="mb-3 text-3xl font-bold">
+            Produit indisponible
+          </h1>
+
           <p className="mb-6 text-sm text-muted-foreground">
             Ce produit est actuellement invisible.
           </p>
+
           <Link to="/">
-            <Button>Back home</Button>
+            <Button>
+              Back home
+            </Button>
           </Link>
         </div>
       </main>
     );
   }
 
-  const pricesByDuration = subscription.pricesByDuration ?? {
-    "1 month": subscription.price,
-    "6 months": subscription.price,
-    "1 year": subscription.price,
+  /* ---------------------------------------------------------
+     PRICES
+  --------------------------------------------------------- */
+
+  const pricesByDuration: Record<
+    DurationKey,
+    string
+  > = {
+    "1 month":
+      subscription.pricesByDuration?.[
+        "1 month"
+      ] ??
+      subscription.price ??
+      "0 DT",
+
+    "2 months":
+      subscription.pricesByDuration?.[
+        "2 months"
+      ] ??
+      "0 DT",
+
+    "3 months":
+      subscription.pricesByDuration?.[
+        "3 months"
+      ] ??
+      "0 DT",
+
+    "6 months":
+      subscription.pricesByDuration?.[
+        "6 months"
+      ] ??
+      "0 DT",
+
+    "1 year":
+      subscription.pricesByDuration?.[
+        "1 year"
+      ] ??
+      "0 DT",
   };
 
-  const selectedPriceText =
-    pricesByDuration[selectedDuration] ??
-    pricesByDuration["1 month"] ??
-    subscription.price ??
-    "0 DT";
+  /* ---------------------------------------------------------
+     AVAILABLE DURATIONS
+     
+     0 DT = duration unavailable
+  --------------------------------------------------------- */
 
-  const originalPrice = priceToNumber(selectedPriceText);
-  const reward = getWheelReward();
+  const availableDurations =
+    durationOptions.filter(
+      ({ key }) =>
+        priceToNumber(
+          pricesByDuration[key]
+        ) > 0
+    );
+
+  /* ---------------------------------------------------------
+     FIX SELECTED DURATION
+     
+     If current selected duration is unavailable,
+     automatically select the first available one.
+  --------------------------------------------------------- */
+
+  useEffect(() => {
+    if (
+      availableDurations.length === 0
+    ) {
+      return;
+    }
+
+    const selectedStillAvailable =
+      availableDurations.some(
+        ({ key }) =>
+          key === selectedDuration
+      );
+
+    if (
+      !selectedStillAvailable
+    ) {
+      setSelectedDuration(
+        availableDurations[0].key
+      );
+    }
+  }, [
+    selectedDuration,
+    availableDurations,
+  ]);
+
+  /* ---------------------------------------------------------
+     NO AVAILABLE DURATION
+  --------------------------------------------------------- */
+
+  if (availableDurations.length === 0) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+        <div className="gradient-border max-w-md rounded-3xl p-8 text-center">
+          <h1 className="mb-3 text-3xl font-bold">
+            Produit indisponible
+          </h1>
+
+          <p className="mb-6 text-sm text-muted-foreground">
+            Ce produit ne possède actuellement
+            aucune durée disponible.
+          </p>
+
+          <Link to="/">
+            <Button className="border-0 gradient-primary text-primary-foreground">
+              Retour à l'accueil
+            </Button>
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  /* ---------------------------------------------------------
+     SELECTED PRICE
+  --------------------------------------------------------- */
+
+  const selectedPriceText =
+    pricesByDuration[
+      selectedDuration
+    ] ?? "0 DT";
+
+  const originalPrice =
+    priceToNumber(
+      selectedPriceText
+    );
+
+  /* ---------------------------------------------------------
+     WHEEL REWARD
+  --------------------------------------------------------- */
+
+  const reward =
+    getWheelReward();
 
   const rewardCanBeUsed =
     reward !== null &&
     !reward.used &&
-    canUseRewardOnProduct(reward, subscription.name);
+    canUseRewardOnProduct(
+      reward,
+      subscription.name
+    );
 
   const displayedPrice =
     rewardCanBeUsed && reward
-      ? calculateRewardPrice(originalPrice, reward.percentage)
+      ? calculateRewardPrice(
+          originalPrice,
+          reward.percentage
+        )
       : originalPrice;
 
+  /* =========================================================
+     ADD TO CART
+  ========================================================= */
+
   const addToCart = () => {
-    const currentReward = getWheelReward();
+    /* -------------------------------------------------------
+       SECURITY CHECK
+       Prevent adding a 0 DT / unavailable duration
+    ------------------------------------------------------- */
+
+    if (
+      priceToNumber(
+        pricesByDuration[
+          selectedDuration
+        ]
+      ) <= 0
+    ) {
+      window.alert(
+        "Cette durée n'est pas disponible."
+      );
+
+      return;
+    }
+
+    const currentReward =
+      getWheelReward();
 
     const canApplyReward =
       currentReward !== null &&
       !currentReward.used &&
-      canUseRewardOnProduct(currentReward, subscription.name);
+      canUseRewardOnProduct(
+        currentReward,
+        subscription.name
+      );
 
     const finalPrice =
-      canApplyReward && currentReward
-        ? calculateRewardPrice(originalPrice, currentReward.percentage)
+      canApplyReward &&
+      currentReward
+        ? calculateRewardPrice(
+            originalPrice,
+            currentReward.percentage
+          )
         : originalPrice;
 
-    const cart = getCart();
-    const cartSlug = `${slug}-${selectedDuration.replaceAll(" ", "-")}`;
-    const existingItem = cart.find((item) => item.slug === cartSlug);
+    const cart =
+      getCart();
 
-    const updatedCart: CartItem[] = existingItem
-      ? cart.map((item) => {
-          if (item.slug !== cartSlug) {
-            return item;
-          }
+    const cartSlug = `${slug}-${selectedDuration.replaceAll(
+      " ",
+      "-"
+    )}`;
 
-          /*
-            Si une récompense est disponible, on l'attache à l'article
-            existant sans augmenter la quantité. Sinon, on ajoute une unité.
-          */
-          if (canApplyReward && currentReward && !item.wheelReward) {
+    const existingItem =
+      cart.find(
+        (item) =>
+          item.slug ===
+          cartSlug
+      );
+
+    const updatedCart: CartItem[] =
+      existingItem
+        ? cart.map((item) => {
+            if (
+              item.slug !==
+              cartSlug
+            ) {
+              return item;
+            }
+
+            if (
+              canApplyReward &&
+              currentReward &&
+              !item.wheelReward
+            ) {
+              return {
+                ...item,
+
+                price:
+                  finalPrice,
+
+                originalPrice,
+
+                wheelReward: {
+                  id:
+                    currentReward.id,
+
+                  label:
+                    currentReward.label,
+
+                  percentage:
+                    currentReward.percentage,
+                },
+              };
+            }
+
             return {
               ...item,
-              price: finalPrice,
-              originalPrice,
-              wheelReward: {
-                id: currentReward.id,
-                label: currentReward.label,
-                percentage: currentReward.percentage,
-              },
+
+              quantity:
+                item.quantity + 1,
             };
-          }
+          })
+        : [
+            ...cart,
 
-          return {
-            ...item,
-            quantity: item.quantity + 1,
-          };
-        })
-      : [
-          ...cart,
-          {
-            slug: cartSlug,
-            name: subscription.name,
-            price: finalPrice,
-            originalPrice,
-            duration: selectedDuration,
-            quantity: 1,
-            wheelReward:
-              canApplyReward && currentReward
-                ? {
-                    id: currentReward.id,
-                    label: currentReward.label,
-                    percentage: currentReward.percentage,
-                  }
-                : null,
-          },
-        ];
+            {
+              slug:
+                cartSlug,
 
-    saveCart(updatedCart);
+              name:
+                subscription.name,
 
-    navigate({ to: "/cart" });
+              price:
+                finalPrice,
+
+              originalPrice,
+
+              duration:
+                selectedDuration,
+
+              quantity: 1,
+
+              wheelReward:
+                canApplyReward &&
+                currentReward
+                  ? {
+                      id:
+                        currentReward.id,
+
+                      label:
+                        currentReward.label,
+
+                      percentage:
+                        currentReward.percentage,
+                    }
+                  : null,
+            },
+          ];
+
+    saveCart(
+      updatedCart
+    );
+
+    navigate({
+      to: "/cart",
+    });
   };
+
+  /* =========================================================
+     UI
+  ========================================================= */
 
   return (
     <main className="min-h-screen overflow-hidden bg-background px-6 py-24 text-foreground">
       <div className="pointer-events-none fixed inset-0 bg-grid opacity-20" />
+
       <div className="pointer-events-none fixed left-10 top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+
       <div className="pointer-events-none fixed bottom-10 right-10 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl">
+        {/* BACK */}
+
         <Link
           to="/"
           className="mb-8 inline-flex items-center gap-2 rounded-full border border-border/70 px-4 py-2 text-sm text-muted-foreground transition-smooth hover:border-primary/40 hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
+
           Back to home
         </Link>
 
@@ -474,19 +810,27 @@ function SubscriptionDetails() {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-primary/5" />
 
           <div className="relative z-10 grid gap-10 lg:grid-cols-[1.25fr_0.75fr]">
+            {/* =================================================
+                LEFT
+            ================================================= */}
+
             <div>
               <div className="mb-5 flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
                   <Sparkles className="h-4 w-4" />
+
                   {subscription.category}
                 </span>
 
-                {rewardCanBeUsed && reward && (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-4 py-1.5 text-sm font-bold text-success">
-                    <Gift className="h-4 w-4" />
-                    -{reward.percentage}% roue
-                  </span>
-                )}
+                {rewardCanBeUsed &&
+                  reward && (
+                    <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-4 py-1.5 text-sm font-bold text-success">
+                      <Gift className="h-4 w-4" />
+
+                      -{reward.percentage}%
+                      roue
+                    </span>
+                  )}
               </div>
 
               <h1 className="mb-5 font-display text-4xl font-bold leading-tight md:text-6xl">
@@ -497,80 +841,154 @@ function SubscriptionDetails() {
                 {subscription.description}
               </p>
 
+              {/* INFO */}
+
               <div className="mb-8 grid gap-4 sm:grid-cols-2">
                 <div className="glass rounded-2xl p-4">
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
                     <Clock className="h-4 w-4 text-primary" />
+
                     Duration
                   </div>
-                  <p className="text-sm text-muted-foreground">{selectedDuration}</p>
+
+                  <p className="text-sm text-muted-foreground">
+                    {
+                      durationOptions.find(
+                        (item) =>
+                          item.key ===
+                          selectedDuration
+                      )?.label
+                    }
+                  </p>
                 </div>
 
                 <div className="glass rounded-2xl p-4">
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
                     <ShieldCheck className="h-4 w-4 text-primary" />
+
                     Guarantee
                   </div>
+
                   <p className="text-sm text-muted-foreground">
-                    Secure activation and support included.
+                    Secure activation and
+                    support included.
                   </p>
                 </div>
               </div>
 
+              {/* FEATURES */}
+
               <ul className="grid gap-4 sm:grid-cols-2">
-                {subscription.features.map((feature: string) => (
-                  <li key={feature} className="flex items-start gap-3 text-sm">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20">
-                      <Check className="h-3.5 w-3.5 text-primary" />
-                    </span>
-                    <span className="leading-relaxed text-muted-foreground">
-                      {feature}
-                    </span>
-                  </li>
-                ))}
+                {subscription.features.map(
+                  (
+                    feature: string
+                  ) => (
+                    <li
+                      key={
+                        feature
+                      }
+                      className="flex items-start gap-3 text-sm"
+                    >
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20">
+                        <Check className="h-3.5 w-3.5 text-primary" />
+                      </span>
+
+                      <span className="leading-relaxed text-muted-foreground">
+                        {
+                          feature
+                        }
+                      </span>
+                    </li>
+                  )
+                )}
               </ul>
             </div>
 
+            {/* =================================================
+                RIGHT
+            ================================================= */}
+
             <aside className="glass h-fit rounded-3xl p-6 shadow-card">
-              <p className="mb-2 text-sm text-muted-foreground">Starting from</p>
+              <p className="mb-2 text-sm text-muted-foreground">
+                Starting from
+              </p>
+
+              {/* PRICE */}
 
               <div className="mb-2 flex items-end gap-3">
                 <span className="gradient-text text-5xl font-bold md:text-6xl">
-                  {formatPrice(displayedPrice)} DT
+                  {formatPrice(
+                    displayedPrice
+                  )}{" "}
+                  DT
                 </span>
 
                 {rewardCanBeUsed && (
                   <span className="mb-2 text-lg text-muted-foreground line-through">
-                    {formatPrice(originalPrice)} DT
+                    {formatPrice(
+                      originalPrice
+                    )}{" "}
+                    DT
                   </span>
                 )}
               </div>
 
-              {rewardCanBeUsed && reward && (
-                <div className="mb-5 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm font-bold text-success">
-                  🎁 {reward.label} sera appliquée dans le panier
-                </div>
-              )}
+              {/* REWARD */}
+
+              {rewardCanBeUsed &&
+                reward && (
+                  <div className="mb-5 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm font-bold text-success">
+                    🎁{" "}
+                    {
+                      reward.label
+                    }{" "}
+                    sera appliquée
+                    dans le panier
+                  </div>
+                )}
+
+              {/* DURATIONS */}
 
               <div className="mb-6">
-                <p className="mb-3 text-sm font-semibold">Choisir la durée</p>
+                <p className="mb-3 text-sm font-semibold">
+                  Choisir la durée
+                </p>
 
                 <div className="grid gap-3">
-                  {(["1 month", "6 months", "1 year"] as const).map(
-                    (duration) => (
+                  {availableDurations.map(
+                    ({
+                      key,
+                      label,
+                    }) => (
                       <button
-                        key={duration}
+                        key={key}
                         type="button"
-                        onClick={() => setSelectedDuration(duration)}
+                        onClick={() =>
+                          setSelectedDuration(
+                            key
+                          )
+                        }
                         className={`rounded-xl border p-3 text-left transition ${
-                          selectedDuration === duration
+                          selectedDuration ===
+                          key
                             ? "border-primary bg-primary/10 text-primary"
                             : "border-border bg-background/30"
                         }`}
                       >
-                        <div className="flex justify-between">
-                          <span>{duration}</span>
-                          <strong>{pricesByDuration[duration] ?? "0 DT"}</strong>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>
+                            {
+                              label
+                            }
+                          </span>
+
+                          <strong>
+                            {
+                              pricesByDuration[
+                                key
+                              ]
+                            }
+                          </strong>
                         </div>
                       </button>
                     )
@@ -578,18 +996,37 @@ function SubscriptionDetails() {
                 </div>
               </div>
 
+              {/* ADD CART */}
+
               <Button
-                onClick={addToCart}
+                onClick={
+                  addToCart
+                }
                 className="h-12 w-full border-0 gradient-primary text-primary-foreground hover:opacity-90 glow-primary"
               >
                 <ShoppingCart className="mr-2 h-4 w-4" />
+
                 Ajouter au panier
               </Button>
 
+              {/* FOOTER INFO */}
+
               <div className="mt-5 space-y-3 border-t border-border/60 pt-5 text-sm text-muted-foreground">
-                <p>✓ Activation rapide après confirmation du paiement</p>
-                <p>✓ Support WhatsApp disponible</p>
-                <p>✓ Paiement local sécurisé</p>
+                <p>
+                  ✓ Activation rapide
+                  après confirmation
+                  du paiement
+                </p>
+
+                <p>
+                  ✓ Support WhatsApp
+                  disponible
+                </p>
+
+                <p>
+                  ✓ Paiement local
+                  sécurisé
+                </p>
               </div>
             </aside>
           </div>
