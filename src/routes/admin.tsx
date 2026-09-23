@@ -320,6 +320,8 @@ function AdminPage() {
         pricesByDuration: {
           "1 month":
             "0 DT",
+           "2 months": "0 DT",
+  "3 months": "0 DT",
 
           "6 months":
             "0 DT",
@@ -419,85 +421,113 @@ function AdminPage() {
     }
   };
 
-  /* =========================================================
-     MODIFIER PRODUIT
-  ========================================================= */
+ /* =========================================================
+   MODIFIER PRODUIT
+========================================================= */
 
-  const openEdit = (
-    id: string
-  ) => {
-    const product =
-      products[id];
+const openEdit = (id: string) => {
+  const product = products[id];
 
-    if (!product) {
-      return;
-    }
+  if (!product) {
+    return;
+  }
 
-    setEditingSlug(id);
+  setEditingSlug(id);
 
-    setEditProduct({
-      ...product,
+  setEditProduct({
+    ...product,
 
-      pricesByDuration: {
-        ...product.pricesByDuration,
-      },
+    // Toujours garantir que les 5 durées existent
+    pricesByDuration: {
+      "1 month": product.pricesByDuration?.["1 month"] ?? "0 DT",
+      "2 months": product.pricesByDuration?.["2 months"] ?? "0 DT",
+      "3 months": product.pricesByDuration?.["3 months"] ?? "0 DT",
+      "6 months": product.pricesByDuration?.["6 months"] ?? "0 DT",
+      "1 year": product.pricesByDuration?.["1 year"] ?? "0 DT",
+    },
 
-      features: [
-        ...product.features,
-      ],
-    });
-  };
+    features: Array.isArray(product.features)
+      ? [...product.features]
+      : [],
+  });
+};
 
-  const closeEdit = () => {
-    setEditingSlug(null);
-    setEditProduct(null);
-  };
+const closeEdit = () => {
+  setEditingSlug(null);
+  setEditProduct(null);
+};
 
-  const saveEdit = async () => {
-    if (
-      !editingSlug ||
-      !editProduct
-    ) {
-      return;
-    }
+const saveEdit = async () => {
+  if (!editingSlug || !editProduct) {
+    return;
+  }
 
-    try {
-      await updateProduct(
-        editingSlug,
-        editProduct
-      );
+  try {
+    // Nettoyage des prix avant sauvegarde
+    const cleanedPrices = {
+      "1 month":
+        editProduct.pricesByDuration?.["1 month"]?.trim() ||
+        "0 DT",
 
-      setProducts(
-        (previous) => ({
-          ...previous,
+      "2 months":
+        editProduct.pricesByDuration?.["2 months"]?.trim() ||
+        "0 DT",
 
-          [editingSlug]:
-            editProduct,
-        })
-      );
+      "3 months":
+        editProduct.pricesByDuration?.["3 months"]?.trim() ||
+        "0 DT",
 
-      closeEdit();
+      "6 months":
+        editProduct.pricesByDuration?.["6 months"]?.trim() ||
+        "0 DT",
 
-      window.alert(
-        "Produit modifié avec succès."
-      );
-    } catch (error) {
-      console.error(
-        "Erreur modification produit:",
-        error
-      );
+      "1 year":
+        editProduct.pricesByDuration?.["1 year"]?.trim() ||
+        "0 DT",
+    };
 
-      const message =
-        error instanceof Error
-          ? error.message
-          : String(error);
+    const updatedProduct = {
+      ...editProduct,
 
-      window.alert(
-        `Impossible de modifier le produit.\n\n${message}`
-      );
-    }
-  };
+      pricesByDuration: cleanedPrices,
 
+      features: Array.isArray(editProduct.features)
+        ? [...editProduct.features]
+        : [],
+    };
+
+    await updateProduct(
+      editingSlug,
+      updatedProduct
+    );
+
+    setProducts((previous) => ({
+      ...previous,
+
+      [editingSlug]: updatedProduct,
+    }));
+
+    closeEdit();
+
+    window.alert(
+      "Produit modifié avec succès."
+    );
+  } catch (error) {
+    console.error(
+      "Erreur modification produit:",
+      error
+    );
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    window.alert(
+      `Impossible de modifier le produit.\n\n${message}`
+    );
+  }
+};
   /* =========================================================
      SUPPRIMER PRODUIT
   ========================================================= */
