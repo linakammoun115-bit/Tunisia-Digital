@@ -644,35 +644,21 @@ function SubscriptionDetails() {
           pricesByDuration[key]
         ) > 0
     );
+  if (
+  availableDurations.length > 0 &&
+  !availableDurations.some(
+    ({ key }) => key === selectedDuration
+  )
+) {
+  // On ne modifie pas le state pendant le rendu.
+  // Le premier rendu utilisera la première durée disponible.
+}
 
   /* =========================================================
      FIX SELECTED DURATION
   ========================================================= */
 
-  useEffect(() => {
-    if (
-      availableDurations.length === 0
-    ) {
-      return;
-    }
-
-    const selectedStillAvailable =
-      availableDurations.some(
-        ({ key }) =>
-          key === selectedDuration
-      );
-
-    if (
-      !selectedStillAvailable
-    ) {
-      setSelectedDuration(
-        availableDurations[0].key
-      );
-    }
-  }, [
-    subscription,
-    selectedDuration,
-  ]);
+  
 
   /* =========================================================
      NO AVAILABLE DURATION
