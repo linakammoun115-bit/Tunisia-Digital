@@ -361,7 +361,7 @@ const [socialError, setSocialError] =
     );
   }
 }
-      } finally {
+     finally {
         if (mounted) {
           setProductsLoading(false);
         }
