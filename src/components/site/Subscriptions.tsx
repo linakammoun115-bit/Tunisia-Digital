@@ -78,7 +78,62 @@ function parsePrice(value: unknown): number {
 
   const parsed = Number(normalized);
 
-  return Number.isFinite(parsed) ? parsed : 0;
+  return Number.isFinite(parsed)
+    ? parsed
+    : 0;
+}
+
+/*
+ * Retourne le plus petit prix strictement supérieur à 0.
+ *
+ * Exemple :
+ * 1 mois  = 0 DT
+ * 2 mois  = 0 DT
+ * 3 mois  = 50 DT
+ * 6 mois  = 30 DT
+ * 1 an    = 120 DT
+ *
+ * Résultat = 30
+ */
+function getLowestAvailablePrice(
+  prices?: Partial<
+    Record<string, string>
+  >
+): number {
+  if (!prices) {
+    return 0;
+  }
+
+  const durationKeys = [
+    "1 month",
+    "2 months",
+    "3 months",
+    "6 months",
+    "1 year",
+  ];
+
+  const availablePrices =
+    durationKeys
+      .map((duration) =>
+        parsePrice(
+          prices[duration]
+        )
+      )
+      .filter(
+        (price) =>
+          Number.isFinite(price) &&
+          price > 0
+      );
+
+  if (
+    availablePrices.length === 0
+  ) {
+    return 0;
+  }
+
+  return Math.min(
+    ...availablePrices
+  );
 }
 
 function formatPrice(price: number): string {
@@ -394,7 +449,6 @@ function SocialSection({
                 <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl transition group-hover:bg-accent/20" />
 
                 <div className="relative z-10">
-                  {/* TYPE */}
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
                       {title}
@@ -410,12 +464,10 @@ function SocialSection({
                     )}
                   </div>
 
-                  {/* NAME */}
                   <h4 className="text-xl font-bold">
                     {service.name}
                   </h4>
 
-                  {/* QUANTITY */}
                   {service.quantity >
                     0 && (
                     <p className="mt-2 text-sm font-semibold text-primary">
@@ -428,20 +480,17 @@ function SocialSection({
                     </p>
                   )}
 
-                  {/* DESCRIPTION */}
                   <p className="mt-3 min-h-[48px] text-sm leading-relaxed text-muted-foreground">
                     {service.description ||
                       "Package Social Boost"}
                   </p>
 
-                  {/* REWARD */}
                   {rewardCanBeUsed && (
                     <div className="mt-4 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
                       🎁 Offre roue disponible
                     </div>
                   )}
 
-                  {/* PRICE */}
                   <div className="mt-4 flex items-end gap-2">
                     <div className="text-3xl font-bold gradient-text">
                       {formatPrice(
@@ -460,7 +509,6 @@ function SocialSection({
                     )}
                   </div>
 
-                  {/* OLD PRICE */}
                   {!rewardCanBeUsed &&
                     service.oldPrice >
                       service.price && (
@@ -475,7 +523,6 @@ function SocialSection({
                       </div>
                     )}
 
-                  {/* BUTTON */}
                   <button
                     type="button"
                     className="mt-6 w-full rounded-xl py-2 gradient-primary text-white transition-opacity hover:opacity-90"
@@ -650,42 +697,14 @@ export function Subscriptions() {
           const loadedSocialProducts =
             await getSocialProducts();
 
-          console.log(
-            "================================"
-          );
-
-          console.log(
-            "PRODUITS SOCIAUX SUPABASE :",
-            loadedSocialProducts
-          );
-
           if (!mounted) {
             return;
           }
-
-          /*
-           * IMPORTANT :
-           *
-           * getSocialProducts()
-           * retourne un Record<string, SocialProduct>
-           *
-           * Il faut donc utiliser
-           * Object.values().
-           */
 
           const productsArray =
             Object.values(
               loadedSocialProducts ?? {}
             );
-
-          console.log(
-            "PRODUITS SOCIAUX EN TABLEAU :",
-            productsArray
-          );
-
-          /*
-           * Normalisation du type.
-           */
 
           const normalizedProducts =
             productsArray.map(
@@ -701,15 +720,6 @@ export function Subscriptions() {
               })
             );
 
-          console.log(
-            "PRODUITS SOCIAUX NORMALISÉS :",
-            normalizedProducts
-          );
-
-          /*
-           * Seulement les produits actifs.
-           */
-
           const activeProducts =
             normalizedProducts.filter(
               (product) =>
@@ -717,19 +727,10 @@ export function Subscriptions() {
                 true
             );
 
-          console.log(
-            "PRODUITS SOCIAUX ACTIFS :",
-            activeProducts
-          );
-
           setSocialProducts(
             activeProducts
           );
         } catch (error) {
-          console.error(
-            "================================"
-          );
-
           console.error(
             "ERREUR PRODUITS SOCIAUX :",
             error
@@ -881,12 +882,19 @@ export function Subscriptions() {
           )
           .map(
             ([slug, product]) => {
+              /*
+               * IMPORTANT :
+               *
+               * On ne prend PLUS uniquement
+               * le prix de 1 mois.
+               *
+               * On cherche le prix le plus bas
+               * parmi toutes les durées disponibles
+               * et strictement supérieur à 0.
+               */
               const originalPrice =
-                parsePrice(
-                  product
-                    .pricesByDuration?.[
-                    "1 month"
-                  ]
+                getLowestAvailablePrice(
+                  product.pricesByDuration
                 );
 
               const oldPrice =
@@ -906,6 +914,22 @@ export function Subscriptions() {
                   ? wheelReward.percentage
                   : 0;
 
+              /*
+               * Si aucun prix n'est disponible,
+               * le prix reste 0.
+               *
+               * Dans le rendu, on affichera
+               * "Prix non disponible".
+               */
+              const finalPrice =
+                rewardCanBeUsed &&
+                originalPrice > 0
+                  ? calculateRewardPrice(
+                      originalPrice,
+                      rewardDiscount
+                    )
+                  : originalPrice;
+
               return {
                 name: product.name,
                 slug,
@@ -913,12 +937,7 @@ export function Subscriptions() {
                   product.category,
                 icon: Film,
                 price:
-                  rewardCanBeUsed
-                    ? calculateRewardPrice(
-                        originalPrice,
-                        rewardDiscount
-                      )
-                    : originalPrice,
+                  finalPrice,
                 originalPrice,
                 oldPrice,
                 duration:
@@ -962,14 +981,16 @@ export function Subscriptions() {
             "discount"
           ) {
             const discountA =
-              a.oldPrice > 0
+              a.oldPrice > 0 &&
+              a.price > 0
                 ? 1 -
                   a.price /
                     a.oldPrice
                 : 0;
 
             const discountB =
-              b.oldPrice > 0
+              b.oldPrice > 0 &&
+              b.price > 0
                 ? 1 -
                   b.price /
                     b.oldPrice
@@ -1070,9 +1091,7 @@ export function Subscriptions() {
     >
       <div className="container relative z-10 mx-auto px-6">
 
-        {/* =================================================
-            HEADER
-        ================================================= */}
+        {/* HEADER */}
 
         <div className="mx-auto mb-12 max-w-2xl text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-primary glass">
@@ -1093,9 +1112,7 @@ export function Subscriptions() {
           </p>
         </div>
 
-        {/* =================================================
-            WHEEL REWARD
-        ================================================= */}
+        {/* WHEEL REWARD */}
 
         {wheelReward && (
           <div className="mx-auto mb-10 max-w-4xl overflow-hidden rounded-3xl border border-primary/30 bg-primary/10 p-6 shadow-lg">
@@ -1127,9 +1144,7 @@ export function Subscriptions() {
           </div>
         )}
 
-        {/* =================================================
-            FILTERS
-        ================================================= */}
+        {/* FILTERS */}
 
         <div className="mx-auto mb-10 max-w-6xl rounded-3xl p-4 glass">
           <div className="mb-4 flex flex-wrap gap-2">
@@ -1218,9 +1233,7 @@ export function Subscriptions() {
           )}
         </div>
 
-        {/* =================================================
-            NORMAL PRODUCTS
-        ================================================= */}
+        {/* NORMAL PRODUCTS */}
 
         {productsLoading && (
           <div className="mx-auto mb-8 max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center text-muted-foreground">
@@ -1258,6 +1271,10 @@ export function Subscriptions() {
               const Icon =
                 plan.icon;
 
+              const hasPrice =
+                plan.originalPrice >
+                0;
+
               return (
                 <article
                   key={
@@ -1280,15 +1297,16 @@ export function Subscriptions() {
                       </div>
 
                       {plan.rewardDiscount >
-                        0 && (
-                        <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-success">
-                          🎁 -
-                          {
-                            plan.rewardDiscount
-                          }
-                          %
-                        </span>
-                      )}
+                        0 &&
+                        hasPrice && (
+                          <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-success">
+                            🎁 -
+                            {
+                              plan.rewardDiscount
+                            }
+                            %
+                          </span>
+                        )}
                     </div>
 
                     <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
@@ -1304,43 +1322,54 @@ export function Subscriptions() {
                     </h3>
 
                     {plan.rewardDiscount >
-                      0 && (
-                      <div className="mb-3 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
-                        🎁 Offre roue
-                        disponible
-                      </div>
-                    )}
+                      0 &&
+                      hasPrice && (
+                        <div className="mb-3 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
+                          🎁 Offre roue
+                          disponible
+                        </div>
+                      )}
 
                     <div className="mb-5">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        <strong>
-                          À partir de
-                        </strong>
-                      </span>
-
-                      <div className="mt-1 flex items-end gap-2">
-                        <div className="flex items-end gap-1">
-                          <span className="text-3xl font-bold gradient-text">
-                            {formatPrice(
-                              plan.price
-                            )}
+                      {hasPrice ? (
+                        <>
+                          <span className="text-xs font-medium text-muted-foreground">
+                            <strong>
+                              À partir de
+                            </strong>
                           </span>
 
-                          <span className="mb-1 text-xl font-bold gradient-text">
-                            DT
+                          <div className="mt-1 flex items-end gap-2">
+                            <div className="flex items-end gap-1">
+                              <span className="text-3xl font-bold gradient-text">
+                                {formatPrice(
+                                  plan.price
+                                )}
+                              </span>
+
+                              <span className="mb-1 text-xl font-bold gradient-text">
+                                DT
+                              </span>
+                            </div>
+
+                            {plan.rewardDiscount >
+                              0 && (
+                              <span className="mb-1 text-sm text-muted-foreground line-through">
+                                {formatPrice(
+                                  plan.originalPrice
+                                )}{" "}
+                                DT
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="rounded-xl border border-border bg-muted/30 px-3 py-3">
+                          <span className="text-sm font-semibold text-muted-foreground">
+                            Prix non disponible
                           </span>
                         </div>
-
-                        {plan.rewardDiscount >
-                          0 && (
-                          <span className="mb-1 text-sm text-muted-foreground line-through">
-                            {formatPrice(
-                              plan.originalPrice
-                            )}{" "}
-                            DT
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
 
                     <Button
@@ -1364,9 +1393,7 @@ export function Subscriptions() {
           )}
         </div>
 
-        {/* =================================================
-            SOCIAL BOOST
-        ================================================= */}
+        {/* SOCIAL BOOST */}
 
         <div className="mt-24">
           <div className="mx-auto mb-12 max-w-2xl text-center">
@@ -1387,15 +1414,11 @@ export function Subscriptions() {
             </p>
           </div>
 
-          {/* LOADING */}
-
           {socialLoading && (
             <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card/50 p-6 text-center text-muted-foreground">
               Chargement des produits sociaux...
             </div>
           )}
-
-          {/* ERROR */}
 
           {!socialLoading &&
             socialError && (
@@ -1403,8 +1426,6 @@ export function Subscriptions() {
                 {socialError}
               </div>
             )}
-
-          {/* EMPTY */}
 
           {!socialLoading &&
             !socialError &&
@@ -1423,8 +1444,6 @@ export function Subscriptions() {
                 </p>
               </div>
             )}
-
-          {/* SOCIAL PRODUCTS */}
 
           {!socialLoading &&
             !socialError &&
