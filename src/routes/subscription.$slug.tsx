@@ -508,8 +508,25 @@ function SubscriptionDetails() {
      PRODUCT
   ========================================================= */
 
-  const subscription =
-    products[slug];
+const subscription =
+  products[slug] ??
+  Object.values(products).find(
+    (product) =>
+      product.name
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "-") ===
+      slug.toLowerCase().trim()
+  );
+  console.log("========== DEBUG GEMINI ==========");
+console.log("SLUG:", slug);
+console.log("PRODUCTS:", products);
+console.log("PRODUCT GEMINI:", products[slug]);
+console.log(
+  "PRICES:",
+  products[slug]?.pricesByDuration
+);
+console.log("==================================");
 
   /* =========================================================
      PRICES BY DURATION
