@@ -25,27 +25,55 @@ export type Subscription = {
   features: string[];
   active: boolean;
   pricesByDuration: DurationPrice;
+
+  /*
+   * Prix principal / ancien système.
+   * Gardé pour compatibilité avec les anciens produits.
+   */
+  price?: string;
 };
 
 type ProductRow = {
   id: string;
+
   name: string | null;
+
+  /*
+   * Ancien champ éventuellement présent
+   * dans la table products.
+   */
+  price?: string | number | null;
+
   old_price: string | number | null;
+
   duration: string | null;
+
   category: string | null;
+
   description: string | null;
+
   features: unknown;
+
   active: boolean | null;
 
-  price_1_month: string | number | null;
-  price_2_months: string | number | null;
-  price_3_months: string | number | null;
-  price_6_months: string | number | null;
-  price_1_year: string | number | null;
+  /*
+   * Nouveaux prix par durée.
+   */
+  price_1_month?: string | number | null;
+
+  price_2_months?: string | number | null;
+
+  price_3_months?: string | number | null;
+
+  price_6_months?: string | number | null;
+
+  price_1_year?: string | number | null;
 
   position: number | null;
+
   updated_at?: string | null;
 };
+
 /* =========================================================
    HELPERS
 ========================================================= */
@@ -71,6 +99,11 @@ function normalizeDuration(
 
   return "1 month";
 }
+
+/* =========================================================
+   FEATURES
+========================================================= */
+
 function normalizeFeatures(
   features: unknown
 ): string[] {
@@ -79,10 +112,16 @@ function normalizeFeatures(
   }
 
   return features.filter(
-    (feature): feature is string =>
+    (
+      feature
+    ): feature is string =>
       typeof feature === "string"
   );
 }
+
+/* =========================================================
+   PRICE NORMALIZATION
+========================================================= */
 
 function normalizePrice(
   price:
@@ -101,6 +140,14 @@ function normalizePrice(
 
   const value = String(price).trim();
 
+  if (!value) {
+    return "0 DT";
+  }
+
+  /*
+   * Si le prix contient déjà DT,
+   * on le conserve.
+   */
   if (
     value
       .toUpperCase()
@@ -109,10 +156,14 @@ function normalizePrice(
     return value;
   }
 
-  return `${value} DT`;
+  return value + " DT";
 }
 
-function priceToDatabase(
+/* =========================================================
+   PRICE TO NUMBER
+========================================================= */
+
+function priceToNumber(
   price:
     | string
     | number
@@ -129,14 +180,82 @@ function priceToDatabase(
 
   const cleaned = String(price)
     .replace(/DT/gi, "")
+    .replace(/\s/g, "")
     .replace(",", ".")
-    .trim();
+    .replace(/[^\d.-]/g, "");
 
   const value = Number(cleaned);
 
-  return Number.isNaN(value)
-    ? 0
-    : value;
+  return Number.isFinite(value)
+    ? value
+    : 0;
+}
+
+/* =========================================================
+   PRICE TO DATABASE
+========================================================= */
+
+function priceToDatabase(
+  price:
+    | string
+    | number
+    | null
+    | undefined
+): number {
+  return priceToNumber(
+    price
+  );
+}
+
+/* =========================================================
+   GET PRICE WITH FALLBACK
+========================================================= */
+
+/*
+ * Cette fonction est importante.
+ *
+ * Si le nouveau champ est vide ou à 0,
+ * on peut utiliser l'ancien prix.
+ */
+function getPriceWithFallback(
+  newPrice:
+    | string
+    | number
+    | null
+    | undefined,
+  fallbackPrice:
+    | string
+    | number
+    | null
+    | undefined
+): string {
+  const newPriceNumber =
+    priceToNumber(
+      newPrice
+    );
+
+  if (
+    newPriceNumber > 0
+  ) {
+    return normalizePrice(
+      newPrice
+    );
+  }
+
+  const fallbackNumber =
+    priceToNumber(
+      fallbackPrice
+    );
+
+  if (
+    fallbackNumber > 0
+  ) {
+    return normalizePrice(
+      fallbackPrice
+    );
+  }
+
+  return "0 DT";
 }
 
 /* =========================================================
@@ -146,9 +265,61 @@ function priceToDatabase(
 function rowToSubscription(
   row: ProductRow
 ): Subscription {
+  /*
+   * Ancien prix principal.
+   *
+   * Certains anciens produits comme Gemini
+   * peuvent encore utiliser "price".
+   */
+  const legacyPrice =
+    row.price;
+
+  /*
+   * Prix 1 mois :
+   *
+   * priorité :
+   * 1. price_1_month
+   * 2. ancien champ price
+   */
+  const price1Month =
+    getPriceWithFallback(
+      row.price_1_month,
+      legacyPrice
+    );
+
+  /*
+   * Les autres durées utilisent uniquement
+   * leur propre colonne.
+   */
+  const price2Months =
+    normalizePrice(
+      row.price_2_months
+    );
+
+  const price3Months =
+    normalizePrice(
+      row.price_3_months
+    );
+
+  const price6Months =
+    normalizePrice(
+      row.price_6_months
+    );
+
+  const price1Year =
+    normalizePrice(
+      row.price_1_year
+    );
+
   return {
     name:
       row.name || "",
+
+    /*
+     * Compatibilité avec l'ancien système.
+     */
+    price:
+      price1Month,
 
     oldPrice:
       normalizePrice(
@@ -174,32 +345,23 @@ function rowToSubscription(
     active:
       row.active ?? true,
 
-   pricesByDuration: {
-  "1 month":
-    normalizePrice(
-      row.price_1_month
-    ),
+    pricesByDuration: {
+      "1 month":
+        price1Month,
 
-  "2 months":
-    normalizePrice(
-      row.price_2_months
-    ),
+      "2 months":
+        price2Months,
 
-  "3 months":
-    normalizePrice(
-      row.price_3_months
-    ),
+      "3 months":
+        price3Months,
 
-  "6 months":
-    normalizePrice(
-      row.price_6_months
-    ),
+      "6 months":
+        price6Months,
 
-  "1 year":
-    normalizePrice(
-      row.price_1_year
-    ),
-},  };
+      "1 year":
+        price1Year,
+    },
+  };
 }
 
 /* =========================================================
@@ -210,6 +372,20 @@ function subscriptionToRow(
   product: Subscription,
   position = 0
 ) {
+  /*
+   * Prix 1 mois.
+   *
+   * Si pricesByDuration n'existe pas,
+   * on utilise product.price.
+   */
+  const price1Month =
+    product
+      .pricesByDuration?.[
+      "1 month"
+    ] ??
+    product.price ??
+    "0 DT";
+
   return {
     name:
       product.name.trim(),
@@ -240,23 +416,24 @@ function subscriptionToRow(
 
     price_1_month:
       priceToDatabase(
+        price1Month
+      ),
+
+    price_2_months:
+      priceToDatabase(
         product
           .pricesByDuration?.[
-          "1 month"
+          "2 months"
         ]
       ),
-     price_2_months:
-  priceToDatabase(
-    product.pricesByDuration?.[
-      "2 months"
-    ]
-  ),
-     price_3_months:
-  priceToDatabase(
-    product.pricesByDuration?.[
-      "3 months"
-    ]
-  ),
+
+    price_3_months:
+      priceToDatabase(
+        product
+          .pricesByDuration?.[
+          "3 months"
+        ]
+      ),
 
     price_6_months:
       priceToDatabase(
@@ -294,16 +471,15 @@ export async function getProducts(): Promise<
   const {
     data,
     error,
-  } =
-    await supabase
-      .from("products")
-      .select("*")
-      .order(
-        "position",
-        {
-          ascending: true,
-        }
-      );
+  } = await supabase
+    .from("products")
+    .select("*")
+    .order(
+      "position",
+      {
+        ascending: true,
+      }
+    );
 
   if (error) {
     console.error(
@@ -350,20 +526,19 @@ export async function getActiveProducts(): Promise<
   const {
     data,
     error,
-  } =
-    await supabase
-      .from("products")
-      .select("*")
-      .eq(
-        "active",
-        true
-      )
-      .order(
-        "position",
-        {
-          ascending: true,
-        }
-      );
+  } = await supabase
+    .from("products")
+    .select("*")
+    .eq(
+      "active",
+      true
+    )
+    .order(
+      "position",
+      {
+        ascending: true,
+      }
+    );
 
   if (error) {
     console.error(
@@ -409,15 +584,14 @@ export async function getProduct(
   const {
     data,
     error,
-  } =
-    await supabase
-      .from("products")
-      .select("*")
-      .eq(
-        "id",
-        id
-      )
-      .maybeSingle();
+  } = await supabase
+    .from("products")
+    .select("*")
+    .eq(
+      "id",
+      id
+    )
+    .maybeSingle();
 
   if (error) {
     console.error(
@@ -447,10 +621,12 @@ export async function createProduct(
   product: Subscription,
   position = 0
 ): Promise<string> {
-  const id = crypto.randomUUID();
+  const id =
+    crypto.randomUUID();
 
   const row = {
     id,
+
     ...subscriptionToRow(
       product,
       position
@@ -477,8 +653,11 @@ export async function createProduct(
     );
   }
 
-  return String(data.id);
+  return String(
+    data.id
+  );
 }
+
 /* =========================================================
    UPDATE PRODUCT
 ========================================================= */
@@ -492,10 +671,9 @@ export async function updateProduct(
     position;
 
   /*
-    Si on ne reçoit pas de position,
-    on garde la position actuelle.
-  */
-
+   * Si aucune position n'est fournie,
+   * on conserve celle existante.
+   */
   if (
     finalPosition ===
     undefined
@@ -503,17 +681,16 @@ export async function updateProduct(
     const {
       data,
       error,
-    } =
-      await supabase
-        .from("products")
-        .select(
-          "position"
-        )
-        .eq(
-          "id",
-          id
-        )
-        .maybeSingle();
+    } = await supabase
+      .from("products")
+      .select(
+        "position"
+      )
+      .eq(
+        "id",
+        id
+      )
+      .maybeSingle();
 
     if (error) {
       console.error(
@@ -535,14 +712,13 @@ export async function updateProduct(
 
   const {
     error,
-  } =
-    await supabase
-      .from("products")
-      .update(row)
-      .eq(
-        "id",
-        id
-      );
+  } = await supabase
+    .from("products")
+    .update(row)
+    .eq(
+      "id",
+      id
+    );
 
   if (error) {
     console.error(
@@ -565,14 +741,13 @@ export async function deleteProduct(
 ): Promise<void> {
   const {
     error,
-  } =
-    await supabase
-      .from("products")
-      .delete()
-      .eq(
-        "id",
-        id
-      );
+  } = await supabase
+    .from("products")
+    .delete()
+    .eq(
+      "id",
+      id
+    );
 
   if (error) {
     console.error(
@@ -596,20 +771,18 @@ export async function setProductActive(
 ): Promise<void> {
   const {
     error,
-  } =
-    await supabase
-      .from("products")
-      .update({
-        active,
+  } = await supabase
+    .from("products")
+    .update({
+      active,
 
-        updated_at:
-          new Date()
-            .toISOString(),
-      })
-      .eq(
-        "id",
-        id
-      );
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq(
+      "id",
+      id
+    );
 
   if (error) {
     console.error(
@@ -633,20 +806,18 @@ export async function updateProductPosition(
 ): Promise<void> {
   const {
     error,
-  } =
-    await supabase
-      .from("products")
-      .update({
-        position,
+  } = await supabase
+    .from("products")
+    .update({
+      position,
 
-        updated_at:
-          new Date()
-            .toISOString(),
-      })
-      .eq(
-        "id",
-        id
-      );
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq(
+      "id",
+      id
+    );
 
   if (error) {
     console.error(
@@ -662,7 +833,6 @@ export async function updateProductPosition(
 
 /* =========================================================
    SAVE ALL PRODUCTS
-   utilisé par admin.tsx
 ========================================================= */
 
 export async function saveProducts(
@@ -672,20 +842,15 @@ export async function saveProducts(
   >
 ): Promise<void> {
   /*
-    1. On récupère tous les produits
-    existants dans Supabase.
-  */
-
+   * Récupérer les produits existants.
+   */
   const {
     data: currentRows,
     error:
       currentRowsError,
-  } =
-    await supabase
-      .from("products")
-      .select(
-        "id"
-      );
+  } = await supabase
+    .from("products")
+    .select("id");
 
   if (
     currentRowsError
@@ -719,10 +884,8 @@ export async function saveProducts(
     );
 
   /*
-    IDs Supabase toujours présents
-    dans l'état Admin.
-  */
-
+   * IDs présents dans l'Admin.
+   */
   const idsStillPresent =
     new Set<string>();
 
@@ -743,10 +906,9 @@ export async function saveProducts(
   }
 
   /*
-    2. Suppression des produits
-    supprimés depuis l'Admin.
-  */
-
+   * Suppression des produits
+   * qui ne sont plus présents.
+   */
   const idsToDelete =
     Array.from(
       existingIds
@@ -764,14 +926,13 @@ export async function saveProducts(
     const {
       error:
         deleteError,
-    } =
-      await supabase
-        .from("products")
-        .delete()
-        .in(
-          "id",
-          idsToDelete
-        );
+    } = await supabase
+      .from("products")
+      .delete()
+      .in(
+        "id",
+        idsToDelete
+      );
 
     if (
       deleteError
@@ -788,10 +949,8 @@ export async function saveProducts(
   }
 
   /*
-    3. UPDATE des produits existants.
-    4. INSERT des nouveaux produits.
-  */
-
+   * UPDATE / INSERT
+   */
   for (
     let index = 0;
     index <
@@ -802,9 +961,7 @@ export async function saveProducts(
       id,
       product,
     ] =
-      entries[
-        index
-      ];
+      entries[index];
 
     const row =
       subscriptionToRow(
@@ -813,9 +970,8 @@ export async function saveProducts(
       );
 
     /*
-      Produit déjà dans Supabase
-    */
-
+     * Produit existant.
+     */
     if (
       existingIds.has(
         id
@@ -824,24 +980,25 @@ export async function saveProducts(
       const {
         error:
           updateError,
-      } =
-        await supabase
-          .from(
-            "products"
-          )
-          .update(
-            row
-          )
-          .eq(
-            "id",
-            id
-          );
+      } = await supabase
+        .from(
+          "products"
+        )
+        .update(
+          row
+        )
+        .eq(
+          "id",
+          id
+        );
 
       if (
         updateError
       ) {
         console.error(
-          `Erreur update ${product.name}:`,
+          "Erreur update " +
+            product.name +
+            ":",
           updateError
         );
 
@@ -854,32 +1011,28 @@ export async function saveProducts(
     }
 
     /*
-      Nouveau produit.
-
-      Le id utilisé dans admin.tsx
-      peut être un slug temporaire.
-
-      On ne l'envoie donc PAS à Supabase.
-      Supabase génère son UUID.
-    */
-
+     * Nouveau produit.
+     *
+     * On laisse Supabase générer son ID.
+     */
     const {
       error:
         insertError,
-    } =
-      await supabase
-        .from(
-          "products"
-        )
-        .insert(
-          row
-        );
+    } = await supabase
+      .from(
+        "products"
+      )
+      .insert(
+        row
+      );
 
     if (
       insertError
     ) {
       console.error(
-        `Erreur insertion ${product.name}:`,
+        "Erreur insertion " +
+          product.name +
+          ":",
         insertError
       );
 
@@ -920,30 +1073,35 @@ export function subscribeToProducts(
       .subscribe();
 
   return () => {
-    void supabase
-      .removeChannel(
-        channel
-      );
+    void supabase.removeChannel(
+      channel
+    );
   };
 }
 
 /* =========================================================
    PENDING ORDERS
-
-   Cette partie reste localStorage
-   pour l'instant car elle n'utilise
-   pas la table products.
 ========================================================= */
 
 export type PendingOrder = {
   id: string;
+
   clientName: string;
+
   phone: string;
+
   status: "En attente";
+
   items: any[];
+
   total: number;
+
   createdAt: string;
 };
+
+/* =========================================================
+   GET PENDING ORDERS
+========================================================= */
 
 export function getPendingOrders(): PendingOrder[] {
   try {
@@ -982,6 +1140,10 @@ export function getPendingOrders(): PendingOrder[] {
   }
 }
 
+/* =========================================================
+   SAVE PENDING ORDERS
+========================================================= */
+
 export function savePendingOrders(
   orders: PendingOrder[]
 ): void {
@@ -993,6 +1155,10 @@ export function savePendingOrders(
   );
 }
 
+/* =========================================================
+   SAVE PENDING CART
+========================================================= */
+
 export function savePendingCart(
   cart: any[]
 ): void {
@@ -1000,7 +1166,8 @@ export function savePendingCart(
     !Array.isArray(
       cart
     ) ||
-    cart.length === 0
+    cart.length ===
+      0
   ) {
     return;
   }
@@ -1008,10 +1175,8 @@ export function savePendingCart(
   const total =
     cart.reduce(
       (
-        sum:
-          number,
-        item:
-          any
+        sum: number,
+        item: any
       ) => {
         const rawPrice =
           String(
@@ -1051,7 +1216,8 @@ export function savePendingCart(
   const pendingOrder: PendingOrder =
     {
       id:
-        `pending-${Date.now()}`,
+        "pending-" +
+        Date.now(),
 
       clientName:
         "Client non confirmé",
@@ -1068,8 +1234,7 @@ export function savePendingCart(
       total,
 
       createdAt:
-        new Date()
-          .toISOString(),
+        new Date().toISOString(),
     };
 
   const existingOrders =
