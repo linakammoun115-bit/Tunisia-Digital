@@ -48,6 +48,38 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
+/* =========================================================
+   HELPERS PRIX
+========================================================= */
+
+const cleanPrice = (value?: string | number | null): string => {
+  const raw = String(value ?? "")
+    .replace(/DT/gi, "")
+    .replace(/\s/g, "")
+    .replace(",", ".")
+    .trim();
+
+  if (!raw) {
+    return "0 DT";
+  }
+
+  const number = Number(raw);
+
+  if (!Number.isFinite(number) || number < 0) {
+    return "0 DT";
+  }
+
+  return `${number} DT`;
+};
+
+const priceInputValue = (
+  value?: string | number | null
+): string => {
+  return String(value ?? "")
+    .replace(/DT/gi, "")
+    .trim();
+};
+
 function AdminPage() {
   const navigate = useNavigate();
 
@@ -202,8 +234,7 @@ function AdminPage() {
         setProductsLoading(true);
         setProductsError("");
 
-        const data =
-          await getProducts();
+        const data = await getProducts();
 
         if (mounted) {
           setProducts(data);
@@ -320,8 +351,12 @@ function AdminPage() {
         pricesByDuration: {
           "1 month":
             "0 DT",
-           "2 months": "0 DT",
-  "3 months": "0 DT",
+
+          "2 months":
+            "0 DT",
+
+          "3 months":
+            "0 DT",
 
           "6 months":
             "0 DT",
@@ -334,9 +369,7 @@ function AdminPage() {
       const id =
         await createProduct(
           product,
-          Object.keys(
-            products
-          ).length
+          Object.keys(products).length
         );
 
       setProducts(
@@ -421,113 +454,183 @@ function AdminPage() {
     }
   };
 
- /* =========================================================
-   MODIFIER PRODUIT
-========================================================= */
+  /* =========================================================
+     MODIFIER PRODUIT
+  ========================================================= */
 
-const openEdit = (id: string) => {
-  const product = products[id];
+  const openEdit = (id: string) => {
+    const product =
+      products[id];
 
-  if (!product) {
-    return;
-  }
+    if (!product) {
+      return;
+    }
 
-  setEditingSlug(id);
+    setEditingSlug(id);
 
-  setEditProduct({
-    ...product,
+    setEditProduct({
+      ...product,
 
-    // Toujours garantir que les 5 durées existent
-    pricesByDuration: {
-      "1 month": product.pricesByDuration?.["1 month"] ?? "0 DT",
-      "2 months": product.pricesByDuration?.["2 months"] ?? "0 DT",
-      "3 months": product.pricesByDuration?.["3 months"] ?? "0 DT",
-      "6 months": product.pricesByDuration?.["6 months"] ?? "0 DT",
-      "1 year": product.pricesByDuration?.["1 year"] ?? "0 DT",
-    },
+      pricesByDuration: {
+        "1 month":
+          product.pricesByDuration?.[
+            "1 month"
+          ] ?? "0 DT",
 
-    features: Array.isArray(product.features)
-      ? [...product.features]
-      : [],
-  });
-};
+        "2 months":
+          product.pricesByDuration?.[
+            "2 months"
+          ] ?? "0 DT",
 
-const closeEdit = () => {
-  setEditingSlug(null);
-  setEditProduct(null);
-};
+        "3 months":
+          product.pricesByDuration?.[
+            "3 months"
+          ] ?? "0 DT",
 
-const saveEdit = async () => {
-  if (!editingSlug || !editProduct) {
-    return;
-  }
+        "6 months":
+          product.pricesByDuration?.[
+            "6 months"
+          ] ?? "0 DT",
 
-  try {
-    // Nettoyage des prix avant sauvegarde
-    const cleanedPrices = {
-      "1 month":
-        editProduct.pricesByDuration?.["1 month"]?.trim() ||
-        "0 DT",
+        "1 year":
+          product.pricesByDuration?.[
+            "1 year"
+          ] ?? "0 DT",
+      },
 
-      "2 months":
-        editProduct.pricesByDuration?.["2 months"]?.trim() ||
-        "0 DT",
+      features:
+        Array.isArray(
+          product.features
+        )
+          ? [
+              ...product.features,
+            ]
+          : [],
+    });
+  };
 
-      "3 months":
-        editProduct.pricesByDuration?.["3 months"]?.trim() ||
-        "0 DT",
+  const closeEdit = () => {
+    setEditingSlug(null);
+    setEditProduct(null);
+  };
 
-      "6 months":
-        editProduct.pricesByDuration?.["6 months"]?.trim() ||
-        "0 DT",
+  /* =========================================================
+     SAUVEGARDE PRODUIT
+  ========================================================= */
 
-      "1 year":
-        editProduct.pricesByDuration?.["1 year"]?.trim() ||
-        "0 DT",
-    };
+  const saveEdit = async () => {
+    if (
+      !editingSlug ||
+      !editProduct
+    ) {
+      return;
+    }
 
-    const updatedProduct = {
-      ...editProduct,
+    try {
+      const cleanedPrices = {
+        "1 month":
+          cleanPrice(
+            editProduct
+              .pricesByDuration?.[
+              "1 month"
+            ]
+          ),
 
-      pricesByDuration: cleanedPrices,
+        "2 months":
+          cleanPrice(
+            editProduct
+              .pricesByDuration?.[
+              "2 months"
+            ]
+          ),
 
-      features: Array.isArray(editProduct.features)
-        ? [...editProduct.features]
-        : [],
-    };
+        "3 months":
+          cleanPrice(
+            editProduct
+              .pricesByDuration?.[
+              "3 months"
+            ]
+          ),
 
-    await updateProduct(
-      editingSlug,
-      updatedProduct
-    );
+        "6 months":
+          cleanPrice(
+            editProduct
+              .pricesByDuration?.[
+              "6 months"
+            ]
+          ),
 
-    setProducts((previous) => ({
-      ...previous,
+        "1 year":
+          cleanPrice(
+            editProduct
+              .pricesByDuration?.[
+              "1 year"
+            ]
+          ),
+      };
 
-      [editingSlug]: updatedProduct,
-    }));
+      const updatedProduct: Subscription = {
+        ...editProduct,
 
-    closeEdit();
+        oldPrice:
+          cleanPrice(
+            editProduct.oldPrice
+          ),
 
-    window.alert(
-      "Produit modifié avec succès."
-    );
-  } catch (error) {
-    console.error(
-      "Erreur modification produit:",
-      error
-    );
+        pricesByDuration:
+          cleanedPrices,
 
-    const message =
-      error instanceof Error
-        ? error.message
-        : String(error);
+        features:
+          Array.isArray(
+            editProduct.features
+          )
+            ? [
+                ...editProduct.features,
+              ]
+            : [],
+      };
 
-    window.alert(
-      `Impossible de modifier le produit.\n\n${message}`
-    );
-  }
-};
+      console.log(
+        "Produit envoyé à Supabase:",
+        updatedProduct
+      );
+
+      await updateProduct(
+        editingSlug,
+        updatedProduct
+      );
+
+      setProducts(
+        (previous) => ({
+          ...previous,
+
+          [editingSlug]:
+            updatedProduct,
+        })
+      );
+
+      closeEdit();
+
+      window.alert(
+        "Produit modifié avec succès ✅"
+      );
+    } catch (error) {
+      console.error(
+        "Erreur modification produit:",
+        error
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+      window.alert(
+        `Impossible de modifier le produit.\n\n${message}`
+      );
+    }
+  };
+
   /* =========================================================
      SUPPRIMER PRODUIT
   ========================================================= */
@@ -1635,7 +1738,7 @@ const saveEdit = async () => {
                       </th>
 
                       <th className="p-4">
-                        Prix
+                        Prix 1 mois
                       </th>
 
                       <th className="p-4">
@@ -1746,7 +1849,6 @@ const saveEdit = async () => {
                           </td>
 
                         </tr>
-
                       )
                     )}
 
@@ -1850,6 +1952,14 @@ const saveEdit = async () => {
 
               <option value="1 month">
                 1 mois
+              </option>
+
+              <option value="2 months">
+                2 mois
+              </option>
+
+              <option value="3 months">
+                3 mois
               </option>
 
               <option value="6 months">
@@ -2272,179 +2382,381 @@ const saveEdit = async () => {
 
             <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl bg-background p-6 shadow-xl">
 
-              <h2 className="mb-5 text-2xl font-bold">
+              <h2 className="mb-2 text-2xl font-bold">
                 Modifier le produit
               </h2>
 
-              <div className="grid gap-3">
+              <p className="mb-6 text-sm text-muted-foreground">
+                Modifie les informations et les prix de chaque durée.
+              </p>
 
-                <input
-                  className="rounded-md border bg-background px-4 py-2"
-                  value={
-                    editProduct.name
-                  }
-                  onChange={(event) =>
-                    setEditProduct({
-                      ...editProduct,
+              <div className="grid gap-4">
 
-                      name:
-                        event.target
-                          .value,
-                    })
-                  }
-                  placeholder="Nom"
-                />
+                {/* NOM */}
 
-                <input
-                  className="rounded-md border bg-background px-4 py-2"
-                  value={
-                    editProduct.oldPrice
-                  }
-                  onChange={(event) =>
-                    setEditProduct({
-                      ...editProduct,
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Nom du produit
+                  </label>
 
-                      oldPrice:
-                        event.target
-                          .value,
-                    })
-                  }
-                  placeholder="Ancien prix"
-                />
+                  <input
+                    className="w-full rounded-md border bg-background px-4 py-2"
+                    value={
+                      editProduct.name
+                    }
+                    onChange={(event) =>
+                      setEditProduct({
+                        ...editProduct,
 
-                <input
-                  className="rounded-md border bg-background px-4 py-2"
-                  value={
-                    editProduct
-                      .pricesByDuration?.[
-                      "1 month"
-                    ] || ""
-                  }
-                  onChange={(event) =>
-                    setEditProduct({
-                      ...editProduct,
+                        name:
+                          event.target
+                            .value,
+                      })
+                    }
+                    placeholder="Nom"
+                  />
+                </div>
 
-                      pricesByDuration:
-                        {
-                          ...editProduct.pricesByDuration,
+                {/* ANCIEN PRIX */}
 
-                          "1 month":
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Ancien prix
+                  </label>
+
+                  <div className="flex items-center gap-2">
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded-md border bg-background px-4 py-2"
+                      value={priceInputValue(
+                        editProduct.oldPrice
+                      )}
+                      onChange={(event) =>
+                        setEditProduct({
+                          ...editProduct,
+
+                          oldPrice:
                             event.target
                               .value,
-                        },
-                    })
-                  }
-                  placeholder="Prix 1 mois"
-                />
+                        })
+                      }
+                      placeholder="100"
+                    />
 
-                <input
-                  className="rounded-md border bg-background px-4 py-2"
-                  value={
-                    editProduct
-                      .pricesByDuration?.[
-                      "6 months"
-                    ] || ""
-                  }
-                  onChange={(event) =>
-                    setEditProduct({
-                      ...editProduct,
+                    <span className="font-bold">
+                      DT
+                    </span>
 
-                      pricesByDuration:
-                        {
-                          ...editProduct.pricesByDuration,
+                  </div>
+                </div>
 
-                          "6 months":
-                            event.target
-                              .value,
-                        },
-                    })
-                  }
-                  placeholder="Prix 6 mois"
-                />
+                {/* PRIX 1 MOIS */}
 
-                <input
-                  className="rounded-md border bg-background px-4 py-2"
-                  value={
-                    editProduct
-                      .pricesByDuration?.[
-                      "1 year"
-                    ] || ""
-                  }
-                  onChange={(event) =>
-                    setEditProduct({
-                      ...editProduct,
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Prix 1 mois
+                  </label>
 
-                      pricesByDuration:
-                        {
-                          ...editProduct.pricesByDuration,
+                  <div className="flex items-center gap-2">
 
-                          "1 year":
-                            event.target
-                              .value,
-                        },
-                    })
-                  }
-                  placeholder="Prix 1 an"
-                />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded-md border bg-background px-4 py-2"
+                      value={priceInputValue(
+                        editProduct
+                          .pricesByDuration?.[
+                          "1 month"
+                        ]
+                      )}
+                      onChange={(event) =>
+                        setEditProduct({
+                          ...editProduct,
 
-                <input
-                  className="rounded-md border bg-background px-4 py-2"
-                  value={
-                    editProduct.category
-                  }
-                  onChange={(event) =>
-                    setEditProduct({
-                      ...editProduct,
+                          pricesByDuration:
+                            {
+                              ...editProduct.pricesByDuration,
 
-                      category:
-                        event.target
-                          .value,
-                    })
-                  }
-                  placeholder="Catégorie"
-                />
+                              "1 month":
+                                event.target
+                                  .value,
+                            },
+                        })
+                      }
+                      placeholder="30"
+                    />
 
-                <textarea
-                  className="rounded-md border bg-background px-4 py-2"
-                  value={
-                    editProduct.description
-                  }
-                  onChange={(event) =>
-                    setEditProduct({
-                      ...editProduct,
+                    <span className="font-bold">
+                      DT
+                    </span>
 
-                      description:
-                        event.target
-                          .value,
-                    })
-                  }
-                  placeholder="Description"
-                />
+                  </div>
+                </div>
 
-                <textarea
-                  className="min-h-32 rounded-md border bg-background px-4 py-2"
-                  value={
-                    editProduct.features.join(
-                      "\n"
-                    )
-                  }
-                  onChange={(event) =>
-                    setEditProduct({
-                      ...editProduct,
+                {/* PRIX 2 MOIS */}
 
-                      features:
-                        event.target.value
-                          .split("\n")
-                          .filter(
-                            (feature) =>
-                              feature.trim()
-                          ),
-                    })
-                  }
-                  placeholder="Une fonctionnalité par ligne"
-                />
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Prix 2 mois
+                  </label>
 
-                <label className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded-md border bg-background px-4 py-2"
+                      value={priceInputValue(
+                        editProduct
+                          .pricesByDuration?.[
+                          "2 months"
+                        ]
+                      )}
+                      onChange={(event) =>
+                        setEditProduct({
+                          ...editProduct,
+
+                          pricesByDuration:
+                            {
+                              ...editProduct.pricesByDuration,
+
+                              "2 months":
+                                event.target
+                                  .value,
+                            },
+                        })
+                      }
+                      placeholder="55"
+                    />
+
+                    <span className="font-bold">
+                      DT
+                    </span>
+
+                  </div>
+                </div>
+
+                {/* PRIX 3 MOIS */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Prix 3 mois
+                  </label>
+
+                  <div className="flex items-center gap-2">
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded-md border bg-background px-4 py-2"
+                      value={priceInputValue(
+                        editProduct
+                          .pricesByDuration?.[
+                          "3 months"
+                        ]
+                      )}
+                      onChange={(event) =>
+                        setEditProduct({
+                          ...editProduct,
+
+                          pricesByDuration:
+                            {
+                              ...editProduct.pricesByDuration,
+
+                              "3 months":
+                                event.target
+                                  .value,
+                            },
+                        })
+                      }
+                      placeholder="75"
+                    />
+
+                    <span className="font-bold">
+                      DT
+                    </span>
+
+                  </div>
+                </div>
+
+                {/* PRIX 6 MOIS */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Prix 6 mois
+                  </label>
+
+                  <div className="flex items-center gap-2">
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded-md border bg-background px-4 py-2"
+                      value={priceInputValue(
+                        editProduct
+                          .pricesByDuration?.[
+                          "6 months"
+                        ]
+                      )}
+                      onChange={(event) =>
+                        setEditProduct({
+                          ...editProduct,
+
+                          pricesByDuration:
+                            {
+                              ...editProduct.pricesByDuration,
+
+                              "6 months":
+                                event.target
+                                  .value,
+                            },
+                        })
+                      }
+                      placeholder="100"
+                    />
+
+                    <span className="font-bold">
+                      DT
+                    </span>
+
+                  </div>
+                </div>
+
+                {/* PRIX 1 AN */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Prix 1 an
+                  </label>
+
+                  <div className="flex items-center gap-2">
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded-md border bg-background px-4 py-2"
+                      value={priceInputValue(
+                        editProduct
+                          .pricesByDuration?.[
+                          "1 year"
+                        ]
+                      )}
+                      onChange={(event) =>
+                        setEditProduct({
+                          ...editProduct,
+
+                          pricesByDuration:
+                            {
+                              ...editProduct.pricesByDuration,
+
+                              "1 year":
+                                event.target
+                                  .value,
+                            },
+                        })
+                      }
+                      placeholder="180"
+                    />
+
+                    <span className="font-bold">
+                      DT
+                    </span>
+
+                  </div>
+                </div>
+
+                {/* CATÉGORIE */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Catégorie
+                  </label>
+
+                  <input
+                    className="w-full rounded-md border bg-background px-4 py-2"
+                    value={
+                      editProduct.category
+                    }
+                    onChange={(event) =>
+                      setEditProduct({
+                        ...editProduct,
+
+                        category:
+                          event.target
+                            .value,
+                      })
+                    }
+                    placeholder="AI Tools"
+                  />
+                </div>
+
+                {/* DESCRIPTION */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Description
+                  </label>
+
+                  <textarea
+                    className="min-h-24 w-full rounded-md border bg-background px-4 py-2"
+                    value={
+                      editProduct.description
+                    }
+                    onChange={(event) =>
+                      setEditProduct({
+                        ...editProduct,
+
+                        description:
+                          event.target
+                            .value,
+                      })
+                    }
+                    placeholder="Description du produit"
+                  />
+                </div>
+
+                {/* FEATURES */}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Fonctionnalités
+                  </label>
+
+                  <textarea
+                    className="min-h-32 w-full rounded-md border bg-background px-4 py-2"
+                    value={
+                      editProduct.features.join(
+                        "\n"
+                      )
+                    }
+                    onChange={(event) =>
+                      setEditProduct({
+                        ...editProduct,
+
+                        features:
+                          event.target.value
+                            .split("\n")
+                            .filter(
+                              (feature) =>
+                                feature.trim()
+                            ),
+                      })
+                    }
+                    placeholder="Une fonctionnalité par ligne"
+                  />
+                </div>
+
+                {/* VISIBILITÉ */}
+
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border p-3">
 
                   <input
                     type="checkbox"
@@ -2462,18 +2774,22 @@ const saveEdit = async () => {
                     }
                   />
 
-                  Produit visible
+                  <span>
+                    Produit visible
+                  </span>
 
                 </label>
 
               </div>
+
+              {/* BOUTONS */}
 
               <div className="mt-6 flex justify-end gap-3">
 
                 <button
                   type="button"
                   onClick={closeEdit}
-                  className="rounded-md border px-4 py-2"
+                  className="rounded-md border px-4 py-2 transition hover:bg-muted"
                 >
                   Annuler
                 </button>
@@ -2481,7 +2797,7 @@ const saveEdit = async () => {
                 <button
                   type="button"
                   onClick={saveEdit}
-                  className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
+                  className="rounded-md bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:opacity-90"
                 >
                   Enregistrer
                 </button>
