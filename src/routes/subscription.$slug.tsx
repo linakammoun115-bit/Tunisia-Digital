@@ -1,11 +1,14 @@
-```tsx
 import {
   createFileRoute,
   Link,
   useNavigate,
 } from "@tanstack/react-router";
 import { savePendingCart, getProducts } from "@/lib/products";
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowLeft,
   Check,
@@ -42,7 +45,6 @@ type Subscription = {
   description: string;
   features: string[];
   active: boolean;
-
   pricesByDuration?: Partial<
     Record<DurationKey, string>
   >;
@@ -55,7 +57,6 @@ type CartItem = {
   originalPrice: number;
   duration: string;
   quantity: number;
-
   wheelReward?: {
     id: string;
     label: string;
@@ -311,7 +312,9 @@ export const subscriptions = {
    ROUTE
 ========================================================= */
 
-export const Route = createFileRoute("/subscription/$slug")({
+export const Route = createFileRoute(
+  "/subscription/$slug"
+)({
   component: SubscriptionDetails,
 });
 
@@ -321,17 +324,19 @@ export const Route = createFileRoute("/subscription/$slug")({
 
 function priceToNumber(
   price: string | number | undefined | null
-) {
+): number {
   const normalized = String(price ?? "0")
     .replace(",", ".")
     .replace(/[^\d.]/g, "");
 
   const parsed = Number(normalized);
 
-  return Number.isFinite(parsed) ? parsed : 0;
+  return Number.isFinite(parsed)
+    ? parsed
+    : 0;
 }
 
-function formatPrice(price: number) {
+function formatPrice(price: number): string {
   return Number.isInteger(price)
     ? String(price)
     : price.toFixed(2);
@@ -339,15 +344,20 @@ function formatPrice(price: number) {
 
 function getCart(): CartItem[] {
   try {
-    const storedCart = localStorage.getItem("cart");
+    const storedCart =
+      localStorage.getItem("cart");
 
     if (!storedCart) {
       return [];
     }
 
-    const parsed = JSON.parse(storedCart);
+    const parsed = JSON.parse(
+      storedCart
+    );
 
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed
+      : [];
   } catch {
     return [];
   }
@@ -401,21 +411,41 @@ const durationOptions: {
 ========================================================= */
 
 function SubscriptionDetails() {
-  const { slug } = Route.useParams();
-  const navigate = useNavigate();
+  const { slug } =
+    Route.useParams();
 
-  const [products, setProducts] = useState<
-    Record<string, Subscription>
-  >({});
+  const navigate =
+    useNavigate();
 
-  const [productsLoading, setProductsLoading] =
-    useState(true);
+  const [products, setProducts] =
+    useState<
+      Record<string, Subscription>
+    >({});
 
-  const [productsError, setProductsError] =
-    useState<string | null>(null);
+  const [
+    productsLoading,
+    setProductsLoading,
+  ] = useState(true);
 
-  const [selectedDuration, setSelectedDuration] =
-    useState<DurationKey>("1 month");
+  const [
+    productsError,
+    setProductsError,
+  ] = useState<string | null>(null);
+
+  const [
+    selectedDuration,
+    setSelectedDuration,
+  ] = useState<DurationKey>(
+    "1 month"
+  );
+
+  /*
+   * Permet d'initialiser automatiquement
+   * la durée la moins chère une seule fois
+   * pour chaque produit.
+   */
+  const initializedProductSlug =
+    useRef<string | null>(null);
 
   /* =========================================================
      LOAD PRODUCTS
@@ -424,44 +454,48 @@ function SubscriptionDetails() {
   useEffect(() => {
     let cancelled = false;
 
-    const loadProducts = async () => {
-      try {
-        setProductsLoading(true);
-        setProductsError(null);
+    const loadProducts =
+      async () => {
+        try {
+          setProductsLoading(true);
+          setProductsError(null);
 
-        const loadedProducts = await getProducts();
+          const loadedProducts =
+            await getProducts();
 
-        if (cancelled) {
-          return;
+          if (cancelled) {
+            return;
+          }
+
+          setProducts(
+            loadedProducts as Record<
+              string,
+              Subscription
+            >
+          );
+        } catch (error) {
+          if (cancelled) {
+            return;
+          }
+
+          console.error(
+            "Erreur chargement produits:",
+            error
+          );
+
+          setProductsError(
+            error instanceof Error
+              ? error.message
+              : String(error)
+          );
+        } finally {
+          if (!cancelled) {
+            setProductsLoading(
+              false
+            );
+          }
         }
-
-        setProducts(
-          loadedProducts as Record<
-            string,
-            Subscription
-          >
-        );
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        console.error(
-          "Erreur chargement produits:",
-          error
-        );
-
-        setProductsError(
-          error instanceof Error
-            ? error.message
-            : String(error)
-        );
-      } finally {
-        if (!cancelled) {
-          setProductsLoading(false);
-        }
-      }
-    };
+      };
 
     void loadProducts();
 
@@ -478,11 +512,7 @@ function SubscriptionDetails() {
     products[slug];
 
   /* =========================================================
-     PRICES
-     
-     On calcule les prix même si le produit n'est pas encore
-     chargé. Cela permet de garder tous les hooks avant
-     les return conditionnels.
+     PRICES BY DURATION
   ========================================================= */
 
   const pricesByDuration: Record<
@@ -490,35 +520,46 @@ function SubscriptionDetails() {
     string
   > = {
     "1 month":
-      subscription?.pricesByDuration?.[
-        "1 month"
-      ] ?? subscription?.price ?? "0 DT",
+      subscription
+        ?.pricesByDuration?.[
+          "1 month"
+        ] ??
+      subscription?.price ??
+      "0 DT",
 
     "2 months":
-      subscription?.pricesByDuration?.[
-        "2 months"
-      ] ?? "0 DT",
+      subscription
+        ?.pricesByDuration?.[
+          "2 months"
+        ] ??
+      "0 DT",
 
     "3 months":
-      subscription?.pricesByDuration?.[
-        "3 months"
-      ] ?? "0 DT",
+      subscription
+        ?.pricesByDuration?.[
+          "3 months"
+        ] ??
+      "0 DT",
 
     "6 months":
-      subscription?.pricesByDuration?.[
-        "6 months"
-      ] ?? "0 DT",
+      subscription
+        ?.pricesByDuration?.[
+          "6 months"
+        ] ??
+      "0 DT",
 
     "1 year":
-      subscription?.pricesByDuration?.[
-        "1 year"
-      ] ?? "0 DT",
+      subscription
+        ?.pricesByDuration?.[
+          "1 year"
+        ] ??
+      "0 DT",
   };
 
   /* =========================================================
      AVAILABLE DURATIONS
-     
-     0 DT = indisponible
+
+     Prix = 0 => durée cachée
   ========================================================= */
 
   const availableDurations =
@@ -530,9 +571,9 @@ function SubscriptionDetails() {
     );
 
   /* =========================================================
-     FIND CHEAPEST AVAILABLE DURATION
-     
-     On cherche toujours le plus petit prix > 0.
+     CHEAPEST AVAILABLE DURATION
+
+     Recherche du prix minimum strictement supérieur à 0.
   ========================================================= */
 
   const cheapestDuration =
@@ -562,55 +603,63 @@ function SubscriptionDetails() {
       : null;
 
   /* =========================================================
-     PRICE SIGNATURE
-     
-     Permet de détecter un changement de prix après le
-     chargement du produit.
+     AUTOMATIC DURATION SELECTION
+
+     1. Au chargement :
+        sélectionne le prix le moins cher.
+
+     2. Après :
+        laisse l'utilisateur choisir.
+
+     3. Si la sélection devient indisponible :
+        sélectionne la moins chère disponible.
   ========================================================= */
 
- const priceSignature =
-  durationOptions
-    .map(
-      ({ key }) =>
-        key + ":" + pricesByDuration[key]
-    )
-    .join("|");
+  useEffect(() => {
+    if (
+      !subscription ||
+      !cheapestDuration
+    ) {
+      return;
+    }
 
-  /* =========================================================
-     SELECT CHEAPEST DURATION AUTOMATICALLY
-     
-     IMPORTANT :
-     Ce hook est AVANT tous les return.
-     
-     Il sélectionne le prix minimum au chargement.
-     Ensuite l'utilisateur peut choisir une autre durée
-     sans que la sélection soit écrasée.
-  ========================================================= */
+    /*
+     * Nouveau produit.
+     */
+    if (
+      initializedProductSlug.current !==
+      slug
+    ) {
+      initializedProductSlug.current =
+        slug;
 
- useEffect(() => {
-  if (!cheapestDuration) {
-    return;
-  }
+      setSelectedDuration(
+        cheapestDuration.key
+      );
 
-  const selectedIsAvailable =
-    availableDurations.some(
-      ({ key }) => key === selectedDuration
-    );
+      return;
+    }
 
-  if (!selectedIsAvailable) {
-    setSelectedDuration(
-      cheapestDuration.key
-    );
-  }
-}, [
-  priceSignature,
-  cheapestDuration?.key,
-  selectedDuration,
-]);
+    /*
+     * Vérifie que la durée sélectionnée
+     * est toujours disponible.
+     */
+    const selectedIsAvailable =
+      availableDurations.some(
+        ({ key }) =>
+          key === selectedDuration
+      );
+
+    if (!selectedIsAvailable) {
+      setSelectedDuration(
+        cheapestDuration.key
+      );
     }
   }, [
-    priceSignature,
+    slug,
+    subscription,
     cheapestDuration?.key,
+    availableDurations.length,
     selectedDuration,
   ]);
 
@@ -727,7 +776,8 @@ function SubscriptionDetails() {
   ========================================================= */
 
   if (
-    availableDurations.length === 0
+    availableDurations.length ===
+    0
   ) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
@@ -797,7 +847,6 @@ function SubscriptionDetails() {
      * Sécurité :
      * impossible d'ajouter une durée à 0 DT.
      */
-
     if (
       priceToNumber(
         pricesByDuration[
@@ -835,16 +884,19 @@ function SubscriptionDetails() {
     const cart =
       getCart();
 
-    /*
-     * Chaque durée possède son propre article
-     * dans le panier.
-     */
+    /* =====================================================
+       CART SLUG
+
+       Pas de ${...}
+     ===================================================== */
 
     const cartSlug =
-      `${slug}-${selectedDuration.replaceAll(
+      slug +
+      "-" +
+      selectedDuration.replaceAll(
         " ",
         "-"
-      )}`;
+      );
 
     const existingItem =
       cart.find(
@@ -862,6 +914,11 @@ function SubscriptionDetails() {
               return item;
             }
 
+            /*
+             * Si le produit existant n'a pas
+             * encore de récompense et qu'une
+             * récompense est disponible.
+             */
             if (
               canApplyReward &&
               currentReward &&
@@ -892,22 +949,15 @@ function SubscriptionDetails() {
         : [
             ...cart,
             {
-              slug:
-                cartSlug,
-
+              slug: cartSlug,
               name:
                 subscription.name,
-
               price:
                 finalPrice,
-
               originalPrice,
-
               duration:
                 selectedDuration,
-
               quantity: 1,
-
               wheelReward:
                 canApplyReward &&
                 currentReward
@@ -958,7 +1008,10 @@ function SubscriptionDetails() {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-primary/5" />
 
           <div className="relative z-10 grid gap-10 lg:grid-cols-[1.25fr_0.75fr]">
-            {/* LEFT */}
+
+            {/* =================================================
+                LEFT
+            ================================================= */}
 
             <div>
               <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -993,7 +1046,6 @@ function SubscriptionDetails() {
                 <div className="glass rounded-2xl p-4">
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
                     <Clock className="h-4 w-4 text-primary" />
-
                     Duration
                   </div>
 
@@ -1011,7 +1063,6 @@ function SubscriptionDetails() {
                 <div className="glass rounded-2xl p-4">
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
                     <ShieldCheck className="h-4 w-4 text-primary" />
-
                     Guarantee
                   </div>
 
@@ -1044,7 +1095,9 @@ function SubscriptionDetails() {
               </ul>
             </div>
 
-            {/* RIGHT */}
+            {/* =================================================
+                RIGHT
+            ================================================= */}
 
             <aside className="glass h-fit rounded-3xl p-6 shadow-card">
               <p className="mb-2 text-sm text-muted-foreground">
@@ -1175,4 +1228,3 @@ function SubscriptionDetails() {
     </main>
   );
 }
-```
