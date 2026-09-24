@@ -587,55 +587,26 @@ function SubscriptionDetails() {
      sans que la sélection soit écrasée.
   ========================================================= */
 
-  useEffect(() => {
-    if (!cheapestDuration) {
-      return;
-    }
+ useEffect(() => {
+  if (!cheapestDuration) {
+    return;
+  }
 
-    if (
-      !availableDurations.some(
-        ({ key }) =>
-          key === selectedDuration
-      )
-    ) {
-      setSelectedDuration(
-        cheapestDuration.key
-      );
+  const selectedIsAvailable =
+    availableDurations.some(
+      ({ key }) => key === selectedDuration
+    );
 
-      return;
-    }
-
-    /*
-     * Si le produit vient juste d'être chargé et que
-     * la durée actuelle est encore "1 month", mais qu'une
-     * autre durée est moins chère, on sélectionne le
-     * prix minimum.
-     *
-     * Cette condition fonctionne au chargement grâce à
-     * priceSignature.
-     */
-    const currentPrice =
-      priceToNumber(
-        pricesByDuration[
-          selectedDuration
-        ]
-      );
-
-    const cheapestPrice =
-      priceToNumber(
-        pricesByDuration[
-          cheapestDuration.key
-        ]
-      );
-
-    if (
-      currentPrice <= 0 ||
-      selectedDuration === "1 month" &&
-      currentPrice !== cheapestPrice
-    ) {
-      setSelectedDuration(
-        cheapestDuration.key
-      );
+  if (!selectedIsAvailable) {
+    setSelectedDuration(
+      cheapestDuration.key
+    );
+  }
+}, [
+  priceSignature,
+  cheapestDuration?.key,
+  selectedDuration,
+]);
     }
   }, [
     priceSignature,
