@@ -48,7 +48,7 @@ type ProductRow = {
 function normalizeDuration(
   value: string | null | undefined
 ): DurationKey {
-  switch (value) {
+  switch (value?.trim().toLowerCase()) {
     case "2 months":
       return "2 months";
 
@@ -77,8 +77,14 @@ function normalizeFeatures(
   }
 
   if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return [];
+    }
+
     try {
-      const parsed = JSON.parse(value);
+      const parsed = JSON.parse(trimmed);
 
       if (Array.isArray(parsed)) {
         return parsed
@@ -86,11 +92,13 @@ function normalizeFeatures(
           .filter(Boolean);
       }
     } catch {
-      return value
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean);
+      // Si ce n'est pas du JSON, on traite chaque ligne comme une feature.
     }
+
+    return trimmed
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 
   return [];
@@ -109,8 +117,13 @@ function normalizePrice(
 
   const raw = String(value)
     .replace(/DT/gi, "")
+    .replace(/\s/g, "")
     .replace(",", ".")
     .trim();
+
+  if (!raw) {
+    return "0 DT";
+  }
 
   const number = Number(raw);
 
@@ -134,14 +147,21 @@ function priceToDatabase(
 
   const raw = String(value)
     .replace(/DT/gi, "")
+    .replace(/\s/g, "")
     .replace(",", ".")
     .trim();
 
+  if (!raw) {
+    return 0;
+  }
+
   const number = Number(raw);
 
-  return Number.isFinite(number)
-    ? number
-    : 0;
+  if (!Number.isFinite(number) || number < 0) {
+    return 0;
+  }
+
+  return number;
 }
 
 /* =========================================================
@@ -207,8 +227,16 @@ function subscriptionToRow(
   product: Subscription,
   position = 0
 ) {
+  const prices = product.pricesByDuration ?? {
+    "1 month": "0 DT",
+    "2 months": "0 DT",
+    "3 months": "0 DT",
+    "6 months": "0 DT",
+    "1 year": "0 DT",
+  };
+
   return {
-    name: product.name,
+    name: product.name || "",
 
     old_price:
       priceToDatabase(
@@ -216,53 +244,45 @@ function subscriptionToRow(
       ),
 
     duration:
-      product.duration,
+      product.duration || "1 month",
 
     category:
-      product.category,
+      product.category || "",
 
     description:
-      product.description,
+      product.description || "",
 
     features:
-      product.features,
+      Array.isArray(product.features)
+        ? product.features
+        : [],
 
     active:
-      product.active,
+      product.active ?? true,
 
     price_1_month:
       priceToDatabase(
-        product.pricesByDuration[
-          "1 month"
-        ]
+        prices["1 month"]
       ),
 
     price_2_months:
       priceToDatabase(
-        product.pricesByDuration[
-          "2 months"
-        ]
+        prices["2 months"]
       ),
 
     price_3_months:
       priceToDatabase(
-        product.pricesByDuration[
-          "3 months"
-        ]
+        prices["3 months"]
       ),
 
     price_6_months:
       priceToDatabase(
-        product.pricesByDuration[
-          "6 months"
-        ]
+        prices["6 months"]
       ),
 
     price_1_year:
       priceToDatabase(
-        product.pricesByDuration[
-          "1 year"
-        ]
+        prices["1 year"]
       ),
 
     position,
@@ -287,6 +307,11 @@ export async function getProducts(): Promise<
     });
 
   if (error) {
+    console.error(
+      "Erreur récupération produits:",
+      error
+    );
+
     throw error;
   }
 
@@ -298,11 +323,50 @@ export async function getProducts(): Promise<
   for (const row of (
     data || []
   ) as ProductRow[]) {
+    if (!row?.id) {
+      continue;
+    }
+
     products[row.id] =
       rowToSubscription(row);
   }
 
   return products;
+}
+
+/* =========================================================
+   SUBSCRIBE TO PRODUCTS
+   Compatible avec Subscriptions.tsx
+========================================================= */
+
+export function subscribeToProducts(
+  callback: (
+    products: Record<string, Subscription>
+  ) => void
+): () => void {
+  let active = true;
+
+  const loadProducts = async () => {
+    try {
+      const products =
+        await getProducts();
+
+      if (active) {
+        callback(products);
+      }
+    } catch (error) {
+      console.error(
+        "Erreur abonnement produits:",
+        error
+      );
+    }
+  };
+
+  void loadProducts();
+
+  return () => {
+    active = false;
+  };
 }
 
 /* =========================================================
@@ -329,6 +393,11 @@ export async function createProduct(
     .single();
 
   if (error) {
+    console.error(
+      "Erreur création produit:",
+      error
+    );
+
     throw error;
   }
 
@@ -349,6 +418,12 @@ export async function updateProduct(
   id: string,
   product: Subscription
 ): Promise<void> {
+  if (!id) {
+    throw new Error(
+      "ID du produit manquant."
+    );
+  }
+
   const row =
     subscriptionToRow(
       product
@@ -362,6 +437,11 @@ export async function updateProduct(
     .eq("id", id);
 
   if (error) {
+    console.error(
+      "Erreur modification produit:",
+      error
+    );
+
     throw error;
   }
 }
@@ -373,6 +453,12 @@ export async function updateProduct(
 export async function deleteProduct(
   id: string
 ): Promise<void> {
+  if (!id) {
+    throw new Error(
+      "ID du produit manquant."
+    );
+  }
+
   const {
     error,
   } = await supabase
@@ -381,6 +467,11 @@ export async function deleteProduct(
     .eq("id", id);
 
   if (error) {
+    console.error(
+      "Erreur suppression produit:",
+      error
+    );
+
     throw error;
   }
 }
@@ -393,6 +484,12 @@ export async function setProductActive(
   id: string,
   active: boolean
 ): Promise<void> {
+  if (!id) {
+    throw new Error(
+      "ID du produit manquant."
+    );
+  }
+
   const {
     error,
   } = await supabase
@@ -403,6 +500,11 @@ export async function setProductActive(
     .eq("id", id);
 
   if (error) {
+    console.error(
+      "Erreur changement statut produit:",
+      error
+    );
+
     throw error;
   }
 }
@@ -420,13 +522,32 @@ export type PendingCart = {
 export function savePendingCart(
   cart: PendingCart[]
 ): void {
-  localStorage.setItem(
-    "pendingCart",
-    JSON.stringify(cart)
-  );
+  if (
+    typeof window === "undefined"
+  ) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(
+      "pendingCart",
+      JSON.stringify(cart)
+    );
+  } catch (error) {
+    console.error(
+      "Erreur sauvegarde panier:",
+      error
+    );
+  }
 }
 
 export function getPendingCart(): PendingCart[] {
+  if (
+    typeof window === "undefined"
+  ) {
+    return [];
+  }
+
   try {
     const saved =
       localStorage.getItem(
@@ -440,10 +561,22 @@ export function getPendingCart(): PendingCart[] {
     const parsed =
       JSON.parse(saved);
 
-    return Array.isArray(parsed)
-      ? parsed
-      : [];
-  } catch {
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter(
+      (item): item is PendingCart =>
+        item &&
+        typeof item.slug === "string" &&
+        typeof item.quantity === "number"
+    );
+  } catch (error) {
+    console.error(
+      "Erreur lecture panier:",
+      error
+    );
+
     return [];
   }
 }
