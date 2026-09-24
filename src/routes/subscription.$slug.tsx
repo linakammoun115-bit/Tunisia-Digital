@@ -1,3 +1,4 @@
+```tsx
 import {
   createFileRoute,
   Link,
@@ -434,19 +435,6 @@ function SubscriptionDetails() {
           return;
         }
 
-        /*
-         * getProducts() retourne :
-         *
-         * {
-         *   "ID_SUPABASE": {
-         *      name: "...",
-         *      ...
-         *   }
-         * }
-         *
-         * Le slug de l'URL doit donc être l'ID Supabase.
-         */
-
         setProducts(
           loadedProducts as Record<
             string,
@@ -488,6 +476,172 @@ function SubscriptionDetails() {
 
   const subscription =
     products[slug];
+
+  /* =========================================================
+     PRICES
+     
+     On calcule les prix même si le produit n'est pas encore
+     chargé. Cela permet de garder tous les hooks avant
+     les return conditionnels.
+  ========================================================= */
+
+  const pricesByDuration: Record<
+    DurationKey,
+    string
+  > = {
+    "1 month":
+      subscription?.pricesByDuration?.[
+        "1 month"
+      ] ?? subscription?.price ?? "0 DT",
+
+    "2 months":
+      subscription?.pricesByDuration?.[
+        "2 months"
+      ] ?? "0 DT",
+
+    "3 months":
+      subscription?.pricesByDuration?.[
+        "3 months"
+      ] ?? "0 DT",
+
+    "6 months":
+      subscription?.pricesByDuration?.[
+        "6 months"
+      ] ?? "0 DT",
+
+    "1 year":
+      subscription?.pricesByDuration?.[
+        "1 year"
+      ] ?? "0 DT",
+  };
+
+  /* =========================================================
+     AVAILABLE DURATIONS
+     
+     0 DT = indisponible
+  ========================================================= */
+
+  const availableDurations =
+    durationOptions.filter(
+      ({ key }) =>
+        priceToNumber(
+          pricesByDuration[key]
+        ) > 0
+    );
+
+  /* =========================================================
+     FIND CHEAPEST AVAILABLE DURATION
+     
+     On cherche toujours le plus petit prix > 0.
+  ========================================================= */
+
+  const cheapestDuration =
+    availableDurations.length > 0
+      ? availableDurations.reduce(
+          (cheapest, current) => {
+            const cheapestPrice =
+              priceToNumber(
+                pricesByDuration[
+                  cheapest.key
+                ]
+              );
+
+            const currentPrice =
+              priceToNumber(
+                pricesByDuration[
+                  current.key
+                ]
+              );
+
+            return currentPrice <
+              cheapestPrice
+              ? current
+              : cheapest;
+          }
+        )
+      : null;
+
+  /* =========================================================
+     PRICE SIGNATURE
+     
+     Permet de détecter un changement de prix après le
+     chargement du produit.
+  ========================================================= */
+
+  const priceSignature =
+    durationOptions
+      .map(
+        ({ key }) =>
+          `${key}:${pricesByDuration[key]}`
+      )
+      .join("|");
+
+  /* =========================================================
+     SELECT CHEAPEST DURATION AUTOMATICALLY
+     
+     IMPORTANT :
+     Ce hook est AVANT tous les return.
+     
+     Il sélectionne le prix minimum au chargement.
+     Ensuite l'utilisateur peut choisir une autre durée
+     sans que la sélection soit écrasée.
+  ========================================================= */
+
+  useEffect(() => {
+    if (!cheapestDuration) {
+      return;
+    }
+
+    if (
+      !availableDurations.some(
+        ({ key }) =>
+          key === selectedDuration
+      )
+    ) {
+      setSelectedDuration(
+        cheapestDuration.key
+      );
+
+      return;
+    }
+
+    /*
+     * Si le produit vient juste d'être chargé et que
+     * la durée actuelle est encore "1 month", mais qu'une
+     * autre durée est moins chère, on sélectionne le
+     * prix minimum.
+     *
+     * Cette condition fonctionne au chargement grâce à
+     * priceSignature.
+     */
+    const currentPrice =
+      priceToNumber(
+        pricesByDuration[
+          selectedDuration
+        ]
+      );
+
+    const cheapestPrice =
+      priceToNumber(
+        pricesByDuration[
+          cheapestDuration.key
+        ]
+      );
+
+    if (
+      currentPrice <= 0 ||
+      selectedDuration === "1 month" &&
+      currentPrice !== cheapestPrice
+    ) {
+      setSelectedDuration(
+        cheapestDuration.key
+      );
+    }
+  }, [
+    priceSignature,
+    cheapestDuration?.key,
+    selectedDuration,
+  ]);
 
   /* =========================================================
      LOADING
@@ -596,69 +750,6 @@ function SubscriptionDetails() {
       </main>
     );
   }
-
-  /* =========================================================
-     PRICES
-  ========================================================= */
-
-  const pricesByDuration: Record<
-    DurationKey,
-    string
-  > = {
-    "1 month":
-      subscription.pricesByDuration?.[
-        "1 month"
-      ] ?? "0 DT",
-
-    "2 months":
-      subscription.pricesByDuration?.[
-        "2 months"
-      ] ?? "0 DT",
-
-    "3 months":
-      subscription.pricesByDuration?.[
-        "3 months"
-      ] ?? "0 DT",
-
-    "6 months":
-      subscription.pricesByDuration?.[
-        "6 months"
-      ] ?? "0 DT",
-
-    "1 year":
-      subscription.pricesByDuration?.[
-        "1 year"
-      ] ?? "0 DT",
-  };
-
-  /* =========================================================
-     AVAILABLE DURATIONS
-     
-     0 DT = durée indisponible
-  ========================================================= */
-
-  const availableDurations =
-    durationOptions.filter(
-      ({ key }) =>
-        priceToNumber(
-          pricesByDuration[key]
-        ) > 0
-    );
-  if (
-  availableDurations.length > 0 &&
-  !availableDurations.some(
-    ({ key }) => key === selectedDuration
-  )
-) {
-  // On ne modifie pas le state pendant le rendu.
-  // Le premier rendu utilisera la première durée disponible.
-}
-
-  /* =========================================================
-     FIX SELECTED DURATION
-  ========================================================= */
-
-  
 
   /* =========================================================
      NO AVAILABLE DURATION
@@ -807,19 +898,14 @@ function SubscriptionDetails() {
             ) {
               return {
                 ...item,
-
                 price:
                   finalPrice,
-
                 originalPrice,
-
                 wheelReward: {
                   id:
                     currentReward.id,
-
                   label:
                     currentReward.label,
-
                   percentage:
                     currentReward.percentage,
                 },
@@ -828,14 +914,12 @@ function SubscriptionDetails() {
 
             return {
               ...item,
-
               quantity:
                 item.quantity + 1,
             };
           })
         : [
             ...cart,
-
             {
               slug:
                 cartSlug,
@@ -859,10 +943,8 @@ function SubscriptionDetails() {
                   ? {
                       id:
                         currentReward.id,
-
                       label:
                         currentReward.label,
-
                       percentage:
                         currentReward.percentage,
                     }
@@ -995,7 +1077,7 @@ function SubscriptionDetails() {
 
             <aside className="glass h-fit rounded-3xl p-6 shadow-card">
               <p className="mb-2 text-sm text-muted-foreground">
-                Starting from
+                À partir de
               </p>
 
               {/* PRICE */}
@@ -1042,37 +1124,45 @@ function SubscriptionDetails() {
                     ({
                       key,
                       label,
-                    }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() =>
-                          setSelectedDuration(
+                    }) => {
+                      const durationPrice =
+                        priceToNumber(
+                          pricesByDuration[
                             key
-                          )
-                        }
-                        className={`rounded-xl border p-3 text-left transition ${
-                          selectedDuration ===
-                          key
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-background/30"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span>
-                            {label}
-                          </span>
+                          ]
+                        );
 
-                          <strong>
-                            {
-                              pricesByDuration[
-                                key
-                              ]
-                            }
-                          </strong>
-                        </div>
-                      </button>
-                    )
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() =>
+                            setSelectedDuration(
+                              key
+                            )
+                          }
+                          className={`rounded-xl border p-3 text-left transition ${
+                            selectedDuration ===
+                            key
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-background/30"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span>
+                              {label}
+                            </span>
+
+                            <strong>
+                              {formatPrice(
+                                durationPrice
+                              )}{" "}
+                              DT
+                            </strong>
+                          </div>
+                        </button>
+                      );
+                    }
                   )}
                 </div>
               </div>
@@ -1114,3 +1204,4 @@ function SubscriptionDetails() {
     </main>
   );
 }
+```
