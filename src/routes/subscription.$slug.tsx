@@ -568,13 +568,13 @@ function SubscriptionDetails() {
      chargement du produit.
   ========================================================= */
 
-  const priceSignature =
-    durationOptions
-      .map(
-        ({ key }) =>
-          `${key}:${pricesByDuration[key]}`
-      )
-      .join("|");
+ const priceSignature =
+  durationOptions
+    .map(
+      ({ key }) =>
+        key + ":" + pricesByDuration[key]
+    )
+    .join("|");
 
   /* =========================================================
      SELECT CHEAPEST DURATION AUTOMATICALLY
