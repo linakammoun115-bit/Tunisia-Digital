@@ -1513,16 +1513,40 @@ function AdminPage() {
     );
   };
 
-  const savePack = async () => {
-    const name =
-      packForm.name.trim();
+ const savePack = async () => {
+  // Vérifier l'authentification Supabase
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-    if (!name) {
-      window.alert(
-        "Le nom du Pack est obligatoire."
-      );
-      return;
-    }
+  console.log("PACK AUTH USER:", user);
+  console.log("PACK AUTH ERROR:", authError);
+
+  if (authError) {
+    console.error("Erreur authentification Supabase:", authError);
+    window.alert(
+      `Erreur d'authentification Supabase.\n\n${authError.message}`
+    );
+    return;
+  }
+
+  if (!user) {
+    console.error("Aucun utilisateur Supabase connecté.");
+    window.alert(
+      "Vous n'êtes pas connecté à Supabase.\n\nVeuillez vous reconnecter avant d'enregistrer le Pack."
+    );
+    return;
+  }
+
+  const name = packForm.name.trim();
+
+  if (!name) {
+    window.alert("Le nom du Pack est obligatoire.");
+    return;
+  }
+
+  // Le reste de ton code savePack continue ici...
 
     const priceNumber =
       Number(
