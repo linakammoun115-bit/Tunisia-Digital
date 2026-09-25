@@ -28,7 +28,7 @@ type SocialProductRow = {
   id: string;
   name: string | null;
   type: string | null;
-  quantity: number | null;
+  quantity: number | string | null;
   price: number | string | null;
   old_price: number | string | null;
   description: string | null;
@@ -45,11 +45,12 @@ type SocialProductRow = {
 function normalizeType(
   type: unknown
 ): SocialProductType {
-  if (
-    type === "likes" ||
-    type === "views"
-  ) {
-    return type;
+  if (type === "likes") {
+    return "likes";
+  }
+
+  if (type === "views") {
+    return "views";
   }
 
   return "followers";
@@ -70,18 +71,34 @@ function normalizeNumber(
     return 0;
   }
 
-  const cleaned =
-    String(value)
-      .replace(/DT/gi, "")
-      .replace(",", ".")
-      .trim();
+  const cleaned = String(value)
+    .replace(/DT/gi, "")
+    .replace(",", ".")
+    .trim();
 
-  const number =
-    Number(cleaned);
+  const parsed = Number(cleaned);
 
-  return Number.isNaN(number)
-    ? 0
-    : number;
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return parsed;
+}
+
+function normalizePosition(
+  value:
+    | number
+    | string
+    | null
+    | undefined
+): number {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return parsed;
 }
 
 /* =========================================================
@@ -92,37 +109,34 @@ function rowToSocialProduct(
   row: SocialProductRow
 ): SocialProduct {
   return {
-    name:
-      row.name || "",
+    name: row.name?.trim() || "",
 
-    type:
-      normalizeType(
-        row.type
-      ),
+    type: normalizeType(
+      row.type
+    ),
 
-    quantity:
-      normalizeNumber(
-        row.quantity
-      ),
+    quantity: normalizeNumber(
+      row.quantity
+    ),
 
-    price:
-      normalizeNumber(
-        row.price
-      ),
+    price: normalizeNumber(
+      row.price
+    ),
 
-    oldPrice:
-      normalizeNumber(
-        row.old_price
-      ),
+    oldPrice: normalizeNumber(
+      row.old_price
+    ),
 
     description:
-      row.description || "",
+      row.description?.trim() || "",
 
     active:
       row.active ?? true,
 
     position:
-      row.position ?? 0,
+      normalizePosition(
+        row.position
+      ),
   };
 }
 
@@ -132,31 +146,45 @@ function rowToSocialProduct(
 
 function socialProductToRow(
   product: SocialProduct,
-  position = 0
+  position?: number
 ) {
   return {
     name:
-      product.name.trim(),
+      String(product.name || "").trim(),
 
     type:
-      product.type,
+      normalizeType(
+        product.type
+      ),
 
     quantity:
-      Number(product.quantity) || 0,
+      normalizeNumber(
+        product.quantity
+      ),
 
     price:
-      Number(product.price) || 0,
+      normalizeNumber(
+        product.price
+      ),
 
     old_price:
-      Number(product.oldPrice) || 0,
+      normalizeNumber(
+        product.oldPrice
+      ),
 
     description:
-      product.description?.trim() || "",
+      String(
+        product.description || ""
+      ).trim(),
 
     active:
-      product.active,
+      product.active ?? true,
 
-    position,
+    position:
+      normalizePosition(
+        position ??
+          product.position
+      ),
 
     updated_at:
       new Date().toISOString(),
@@ -298,6 +326,10 @@ export async function getSocialProductsByType(
 export async function getSocialProduct(
   id: string
 ): Promise<SocialProduct | null> {
+  if (!id) {
+    return null;
+  }
+
   const {
     data,
     error,
@@ -315,7 +347,8 @@ export async function getSocialProduct(
     );
 
     throw new Error(
-      error.message
+      error.message ||
+        "Impossible de charger le produit social."
     );
   }
 
@@ -336,23 +369,75 @@ export async function createSocialProduct(
   product: SocialProduct,
   position = 0
 ): Promise<string> {
-  /*
-   * Génération de l'ID côté application.
-   * La table Supabase possède également
-   * un DEFAULT gen_random_uuid().
-   */
-  const id =
-    crypto.randomUUID();
+  const cleanProduct: SocialProduct = {
+    ...product,
+
+    name:
+      String(product.name || "").trim(),
+
+    type:
+      normalizeType(
+        product.type
+      ),
+
+    quantity:
+      normalizeNumber(
+        product.quantity
+      ),
+
+    price:
+      normalizeNumber(
+        product.price
+      ),
+
+    oldPrice:
+      normalizeNumber(
+        product.oldPrice
+      ),
+
+    description:
+      String(
+        product.description || ""
+      ).trim(),
+
+    active:
+      product.active ?? true,
+
+    position:
+      normalizePosition(
+        position
+      ),
+  };
+
+  if (!cleanProduct.name) {
+    throw new Error(
+      "Le nom du produit est obligatoire."
+    );
+  }
+
+  if (cleanProduct.quantity <= 0) {
+    throw new Error(
+      "La quantité doit être supérieure à 0."
+    );
+  }
+
+  if (cleanProduct.price < 0) {
+    throw new Error(
+      "Le prix ne peut pas être négatif."
+    );
+  }
 
   const row = {
-    id,
-
     ...socialProductToRow(
-      product,
+      cleanProduct,
       position
     ),
   };
 
+  /*
+   * On laisse Supabase générer l'ID
+   * avec le DEFAULT gen_random_uuid().
+   */
   const {
     data,
     error,
@@ -370,7 +455,8 @@ export async function createSocialProduct(
     );
 
     throw new Error(
-      error.message
+      error.message ||
+        "Impossible de créer le produit social."
     );
   }
 
@@ -388,19 +474,88 @@ export async function updateSocialProduct(
   product: SocialProduct,
   position?: number
 ): Promise<void> {
+  if (!id) {
+    throw new Error(
+      "ID du produit social manquant."
+    );
+  }
+
+  const cleanProduct: SocialProduct = {
+    ...product,
+
+    name:
+      String(product.name || "").trim(),
+
+    type:
+      normalizeType(
+        product.type
+      ),
+
+    quantity:
+      normalizeNumber(
+        product.quantity
+      ),
+
+    price:
+      normalizeNumber(
+        product.price
+      ),
+
+    oldPrice:
+      normalizeNumber(
+        product.oldPrice
+      ),
+
+    description:
+      String(
+        product.description || ""
+      ).trim(),
+
+    active:
+      product.active ?? true,
+
+    position:
+      normalizePosition(
+        position ??
+          product.position
+      ),
+  };
+
+  if (!cleanProduct.name) {
+    throw new Error(
+      "Le nom du produit est obligatoire."
+    );
+  }
+
+  if (cleanProduct.quantity <= 0) {
+    throw new Error(
+      "La quantité doit être supérieure à 0."
+    );
+  }
+
+  if (cleanProduct.price < 0) {
+    throw new Error(
+      "Le prix ne peut pas être négatif."
+    );
+  }
+
   const row =
     socialProductToRow(
-      product,
-      position ?? product.position ?? 0
+      cleanProduct,
+      position ??
+        cleanProduct.position
     );
 
   const {
+    data,
     error,
   } =
     await supabase
       .from("social_products")
       .update(row)
-      .eq("id", id);
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
 
   if (error) {
     console.error(
@@ -409,7 +564,18 @@ export async function updateSocialProduct(
     );
 
     throw new Error(
-      error.message
+      error.message ||
+        "Impossible de modifier le produit social."
+    );
+  }
+
+  /*
+   * Si aucune ligne n'a été trouvée,
+   * l'ID envoyé n'existe probablement plus.
+   */
+  if (!data) {
+    throw new Error(
+      "Le produit social n'existe plus ou n'a pas pu être modifié."
     );
   }
 }
@@ -421,6 +587,12 @@ export async function updateSocialProduct(
 export async function deleteSocialProduct(
   id: string
 ): Promise<void> {
+  if (!id) {
+    throw new Error(
+      "ID du produit social manquant."
+    );
+  }
+
   const {
     error,
   } =
@@ -436,7 +608,8 @@ export async function deleteSocialProduct(
     );
 
     throw new Error(
-      error.message
+      error.message ||
+        "Impossible de supprimer le produit social."
     );
   }
 }
@@ -449,13 +622,19 @@ export async function setSocialProductActive(
   id: string,
   active: boolean
 ): Promise<void> {
+  if (!id) {
+    throw new Error(
+      "ID du produit social manquant."
+    );
+  }
+
   const {
     error,
   } =
     await supabase
       .from("social_products")
       .update({
-        active,
+        active: Boolean(active),
 
         updated_at:
           new Date().toISOString(),
@@ -469,7 +648,8 @@ export async function setSocialProductActive(
     );
 
     throw new Error(
-      error.message
+      error.message ||
+        "Impossible de modifier le statut du produit social."
     );
   }
 }
@@ -482,13 +662,25 @@ export async function updateSocialProductPosition(
   id: string,
   position: number
 ): Promise<void> {
+  if (!id) {
+    throw new Error(
+      "ID du produit social manquant."
+    );
+  }
+
+  const cleanPosition =
+    normalizePosition(
+      position
+    );
+
   const {
     error,
   } =
     await supabase
       .from("social_products")
       .update({
-        position,
+        position:
+          cleanPosition,
 
         updated_at:
           new Date().toISOString(),
@@ -502,7 +694,8 @@ export async function updateSocialProductPosition(
     );
 
     throw new Error(
-      error.message
+      error.message ||
+        "Impossible de modifier la position du produit social."
     );
   }
 }
