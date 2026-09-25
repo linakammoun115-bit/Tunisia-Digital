@@ -1,20 +1,4 @@
 import {
-  createFileRoute,
-  Link,
-  useNavigate,
-} from "@tanstack/react-router";
-
-import {
-  useEffect,
-  useState,
-} from "react";
-
-import {
-  Gift,
-  ShoppingBag,
-} from "lucide-react";
-
-import {
   getProducts,
   createProduct,
   updateProduct,
@@ -26,6 +10,7 @@ import {
 import {
   getSocialProducts,
   createSocialProduct,
+  updateSocialProduct,
   deleteSocialProduct,
   setSocialProductActive,
   type SocialProduct,
@@ -44,61 +29,115 @@ import {
   type PaymentMethod,
 } from "@/lib/paymentMethods";
 
+import {
+  createFileRoute,
+  useNavigate,
+} from "@tanstack/react-router";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
 export const Route = createFileRoute("/admin")({
-  component: AdminPage,
+  component: Admin,
 });
 
-/* =========================================================
-   HELPERS PRIX
-========================================================= */
-
-const cleanPrice = (value?: string | number | null): string => {
-  const raw = String(value ?? "")
-    .replace(/DT/gi, "")
-    .replace(/\s/g, "")
-    .replace(",", ".")
-    .trim();
-
-  if (!raw) {
-    return "0 DT";
-  }
-
-  const number = Number(raw);
-
-  if (!Number.isFinite(number) || number < 0) {
-    return "0 DT";
-  }
-
-  return `${number} DT`;
-};
-
-const priceInputValue = (
-  value?: string | number | null
-): string => {
-  return String(value ?? "")
-    .replace(/DT/gi, "")
-    .trim();
-};
-
-function AdminPage() {
+function Admin() {
   const navigate = useNavigate();
 
   /* =========================================================
-     PRODUITS
+     AUTH
   ========================================================= */
 
-  const [products, setProducts] = useState<
+  useEffect(() => {
+    const auth =
+      localStorage.getItem("adminAuth");
+
+    if (auth !== "true") {
+      navigate({
+        to: "/admin-login",
+      });
+    }
+  }, [navigate]);
+
+  /* =========================================================
+     NORMAL PRODUCTS
+  ========================================================= */
+
+  const [
+    products,
+    setProducts,
+  ] = useState<
     Record<string, Subscription>
   >({});
 
-  const [productsLoading, setProductsLoading] =
-    useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [productsError, setProductsError] =
-    useState("");
+  const [
+    productName,
+    setProductName,
+  ] = useState("");
 
-  const [newName, setNewName] =
-    useState("");
+  const [
+    productCategory,
+    setProductCategory,
+  ] = useState("Streaming");
+
+  const [
+    productDescription,
+    setProductDescription,
+  ] = useState("");
+
+  const [
+    productOldPrice,
+    setProductOldPrice,
+  ] = useState("");
+
+  const [
+    productDuration,
+    setProductDuration,
+  ] =
+    useState<
+      Subscription["duration"]
+    >("1 month");
+
+  const [
+    productFeatures,
+    setProductFeatures,
+  ] = useState("");
+
+  const [
+    productPrice1,
+    setProductPrice1,
+  ] = useState("");
+
+  const [
+    productPrice2,
+    setProductPrice2,
+  ] = useState("");
+
+  const [
+    productPrice3,
+    setProductPrice3,
+  ] = useState("");
+
+  const [
+    productPrice6,
+    setProductPrice6,
+  ] = useState("");
+
+  const [
+    productPriceYear,
+    setProductPriceYear,
+  ] = useState("");
+
+  /* =========================================================
+     NORMAL PRODUCT EDIT
+  ========================================================= */
 
   const [
     editingSlug,
@@ -108,18 +147,22 @@ function AdminPage() {
   const [
     editProduct,
     setEditProduct,
-  ] = useState<Subscription | null>(null);
+  ] =
+    useState<Subscription | null>(
+      null
+    );
 
   /* =========================================================
-     PRODUITS SOCIAUX
+     SOCIAL PRODUCTS
   ========================================================= */
 
   const [
     socialProducts,
     setSocialProducts,
-  ] = useState<
-    Record<string, SocialProduct>
-  >({});
+  ] =
+    useState<
+      Record<string, SocialProduct>
+    >({});
 
   const [
     socialLoading,
@@ -129,9 +172,10 @@ function AdminPage() {
   const [
     socialType,
     setSocialType,
-  ] = useState<SocialProductType>(
-    "followers"
-  );
+  ] =
+    useState<SocialProductType>(
+      "followers"
+    );
 
   const [
     socialName,
@@ -149,14 +193,26 @@ function AdminPage() {
   ] = useState("");
 
   const [
-    socialOldPrice,
-    setSocialOldPrice,
-  ] = useState("");
-
-  const [
     socialDescription,
     setSocialDescription,
   ] = useState("");
+
+  /* =========================================================
+     SOCIAL PRODUCT EDIT
+  ========================================================= */
+
+  const [
+    editingSocialId,
+    setEditingSocialId,
+  ] = useState<string | null>(null);
+
+  const [
+    editSocialProduct,
+    setEditSocialProduct,
+  ] =
+    useState<SocialProduct | null>(
+      null
+    );
 
   /* =========================================================
      CLIENTS
@@ -165,534 +221,412 @@ function AdminPage() {
   const [
     clients,
     setClients,
-  ] = useState<Client[]>(getClients);
-
-  const [
-    newClient,
-    setNewClient,
-  ] = useState({
-    name: "",
-    phone: "",
-    note: "",
-  });
-
-  const [
-    productFilter,
-    setProductFilter,
-  ] = useState("");
-
-  const [
-    durationFilter,
-    setDurationFilter,
-  ] = useState("");
+  ] = useState<Client[]>([]);
 
   /* =========================================================
-     PAIEMENTS
+     PAYMENT METHODS
   ========================================================= */
 
   const [
     paymentMethods,
     setPaymentMethods,
-  ] = useState<PaymentMethod[]>(
-    getPaymentMethods
-  );
-
-  const [
-    newPaymentName,
-    setNewPaymentName,
-  ] = useState("");
-
-  const [
-    newPaymentDetails,
-    setNewPaymentDetails,
-  ] = useState("");
+  ] = useState<
+    PaymentMethod[]
+  >([]);
 
   /* =========================================================
-     VÉRIFICATION ADMIN
+     LOAD DATA
   ========================================================= */
 
   useEffect(() => {
-    const isAdmin =
-      localStorage.getItem("adminAuth") === "true";
+    loadProducts();
+    loadSocialProducts();
+    loadClients();
+    loadPaymentMethods();
+  }, []);
 
-    if (!isAdmin) {
-      navigate({
-        to: "/admin-login",
-      });
-    }
-  }, [navigate]);
-
-  /* =========================================================
-     CHARGEMENT PRODUITS
-  ========================================================= */
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadProducts = async () => {
+  const loadProducts =
+    async () => {
       try {
-        setProductsLoading(true);
-        setProductsError("");
+        setLoading(true);
 
-        const data = await getProducts();
+        const data =
+          await getProducts();
 
-        if (mounted) {
-          setProducts(data);
-        }
+        setProducts(data);
       } catch (error) {
         console.error(
-          "Erreur chargement produits Supabase:",
+          "Erreur chargement produits:",
           error
         );
-
-        if (mounted) {
-          setProductsError(
-            error instanceof Error
-              ? error.message
-              : "Impossible de charger les produits."
-          );
-        }
       } finally {
-        if (mounted) {
-          setProductsLoading(false);
-        }
+        setLoading(false);
       }
     };
 
-    void loadProducts();
+  const loadSocialProducts =
+    async () => {
+      try {
+        setSocialLoading(true);
 
-    return () => {
-      mounted = false;
+        const data =
+          await getSocialProducts();
+
+        setSocialProducts(data);
+      } catch (error) {
+        console.error(
+          "Erreur chargement produits sociaux:",
+          error
+        );
+      } finally {
+        setSocialLoading(false);
+      }
     };
-  }, []);
+
+  const loadClients =
+    async () => {
+      try {
+        const data =
+          await getClients();
+
+        setClients(data);
+      } catch (error) {
+        console.error(
+          "Erreur chargement clients:",
+          error
+        );
+      }
+    };
+
+  const loadPaymentMethods =
+    async () => {
+      try {
+        const data =
+          await getPaymentMethods();
+
+        setPaymentMethods(data);
+      } catch (error) {
+        console.error(
+          "Erreur chargement moyens de paiement:",
+          error
+        );
+      }
+    };
 
   /* =========================================================
-     CHARGEMENT PRODUITS SOCIAUX
+     NORMAL PRODUCT - ADD
   ========================================================= */
 
-  useEffect(() => {
-    let mounted = true;
+  const addProduct =
+    async () => {
+      if (!productName.trim()) {
+        window.alert(
+          "Écris le nom du produit."
+        );
+        return;
+      }
 
-    const loadSocialProducts =
-      async () => {
-        try {
-          setSocialLoading(true);
-
-          const data =
-            await getSocialProducts();
-
-          if (mounted) {
-            setSocialProducts(data);
-          }
-        } catch (error) {
-          console.error(
-            "Erreur chargement produits sociaux:",
-            error
-          );
-
-          if (mounted) {
-            window.alert(
-              error instanceof Error
-                ? error.message
-                : "Impossible de charger les produits sociaux."
-            );
-          }
-        } finally {
-          if (mounted) {
-            setSocialLoading(false);
-          }
-        }
-      };
-
-    void loadSocialProducts();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  /* =========================================================
-     AJOUT PRODUIT
-  ========================================================= */
-
-  const addProduct = async () => {
-    const name =
-      newName.trim();
-
-    if (!name) {
-      window.alert(
-        "Écris le nom du produit."
-      );
-      return;
-    }
-
-    try {
-      const product: Subscription = {
-        name,
-
-        oldPrice:
-          "0 DT",
-
-        duration:
-          "1 month",
-
-        category:
-          "New",
-
-        description:
-          "",
-
-        features:
-          [],
-
-        active:
-          true,
-
-        pricesByDuration: {
+      try {
+        const pricesByDuration = {
           "1 month":
-            "0 DT",
+            productPrice1.trim(),
 
           "2 months":
-            "0 DT",
+            productPrice2.trim(),
 
           "3 months":
-            "0 DT",
+            productPrice3.trim(),
 
           "6 months":
-            "0 DT",
+            productPrice6.trim(),
 
           "1 year":
-            "0 DT",
-        },
-      };
+            productPriceYear.trim(),
+        };
 
-      const id =
-        await createProduct(
-          product,
-          Object.keys(products).length
-        );
+        const product: Subscription =
+          {
+            name:
+              productName.trim(),
 
-      setProducts(
-        (previous) => ({
-          ...previous,
+            oldPrice:
+              productOldPrice.trim(),
 
-          [id]:
-            product,
-        })
-      );
+            duration:
+              productDuration,
 
-      setNewName("");
+            category:
+              productCategory,
 
-      window.alert(
-        "Produit ajouté avec succès ✅"
-      );
-    } catch (error) {
-      console.error(
-        "Erreur ajout produit:",
-        error
-      );
+            description:
+              productDescription.trim(),
 
-      const message =
-        error instanceof Error
-          ? error.message
-          : String(error);
+            features:
+              productFeatures
+                .split("\n")
+                .map((item) =>
+                  item.trim()
+                )
+                .filter(Boolean),
 
-      window.alert(
-        `Impossible d'ajouter le produit.\n\n${message}`
-      );
-    }
-  };
+            active: true,
 
-  /* =========================================================
-     VISIBILITÉ PRODUIT
-  ========================================================= */
-
-  const toggleVisible = async (
-    id: string
-  ) => {
-    const product =
-      products[id];
-
-    if (!product) {
-      return;
-    }
-
-    const nextActive =
-      !product.active;
-
-    try {
-      await setProductActive(
-        id,
-        nextActive
-      );
-
-      setProducts(
-        (previous) => ({
-          ...previous,
-
-          [id]: {
-            ...previous[id],
-            active:
-              nextActive,
-          },
-        })
-      );
-    } catch (error) {
-      console.error(
-        "Erreur changement visibilité produit:",
-        error
-      );
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : String(error);
-
-      window.alert(
-        `Impossible de modifier la visibilité.\n\n${message}`
-      );
-    }
-  };
-
-  /* =========================================================
-     MODIFIER PRODUIT
-  ========================================================= */
-
-  const openEdit = (id: string) => {
-    const product =
-      products[id];
-
-    if (!product) {
-      return;
-    }
-
-    setEditingSlug(id);
-
-    setEditProduct({
-      ...product,
-
-      pricesByDuration: {
-        "1 month":
-          product.pricesByDuration?.[
-            "1 month"
-          ] ?? "0 DT",
-
-        "2 months":
-          product.pricesByDuration?.[
-            "2 months"
-          ] ?? "0 DT",
-
-        "3 months":
-          product.pricesByDuration?.[
-            "3 months"
-          ] ?? "0 DT",
-
-        "6 months":
-          product.pricesByDuration?.[
-            "6 months"
-          ] ?? "0 DT",
-
-        "1 year":
-          product.pricesByDuration?.[
-            "1 year"
-          ] ?? "0 DT",
-      },
-
-      features:
-        Array.isArray(
-          product.features
-        )
-          ? [
-              ...product.features,
-            ]
-          : [],
-    });
-  };
-
-  const closeEdit = () => {
-    setEditingSlug(null);
-    setEditProduct(null);
-  };
-
-  /* =========================================================
-     SAUVEGARDE PRODUIT
-  ========================================================= */
-
-  const saveEdit = async () => {
-    if (
-      !editingSlug ||
-      !editProduct
-    ) {
-      return;
-    }
-
-    try {
-      const cleanedPrices = {
-        "1 month":
-          cleanPrice(
-            editProduct
-              .pricesByDuration?.[
-              "1 month"
-            ]
-          ),
-
-        "2 months":
-          cleanPrice(
-            editProduct
-              .pricesByDuration?.[
-              "2 months"
-            ]
-          ),
-
-        "3 months":
-          cleanPrice(
-            editProduct
-              .pricesByDuration?.[
-              "3 months"
-            ]
-          ),
-
-        "6 months":
-          cleanPrice(
-            editProduct
-              .pricesByDuration?.[
-              "6 months"
-            ]
-          ),
-
-        "1 year":
-          cleanPrice(
-            editProduct
-              .pricesByDuration?.[
-              "1 year"
-            ]
-          ),
-      };
-
-      const updatedProduct: Subscription = {
-        ...editProduct,
-
-        oldPrice:
-          cleanPrice(
-            editProduct.oldPrice
-          ),
-
-        pricesByDuration:
-          cleanedPrices,
-
-        features:
-          Array.isArray(
-            editProduct.features
-          )
-            ? [
-                ...editProduct.features,
-              ]
-            : [],
-      };
-
-      console.log(
-        "Produit envoyé à Supabase:",
-        updatedProduct
-      );
-
-      await updateProduct(
-        editingSlug,
-        updatedProduct
-      );
-
-      setProducts(
-        (previous) => ({
-          ...previous,
-
-          [editingSlug]:
-            updatedProduct,
-        })
-      );
-
-      closeEdit();
-
-      window.alert(
-        "Produit modifié avec succès ✅"
-      );
-    } catch (error) {
-      console.error(
-        "Erreur modification produit:",
-        error
-      );
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : String(error);
-
-      window.alert(
-        `Impossible de modifier le produit.\n\n${message}`
-      );
-    }
-  };
-
-  /* =========================================================
-     SUPPRIMER PRODUIT
-  ========================================================= */
-
-  const deleteProduct = async (
-    id: string
-  ) => {
-    const confirmed =
-      window.confirm(
-        "Voulez-vous supprimer ce produit ?"
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await deleteProductFromDb(
-        id
-      );
-
-      setProducts(
-        (previous) => {
-          const updated = {
-            ...previous,
+            pricesByDuration,
           };
 
-          delete updated[id];
+        const slug =
+          await createProduct(
+            product,
+            Object.keys(products)
+              .length
+          );
 
-          return updated;
-        }
-      );
+        setProducts(
+          (previous) => ({
+            ...previous,
 
-      window.alert(
-        "Produit supprimé avec succès."
-      );
-    } catch (error) {
-      console.error(
-        "Erreur suppression produit:",
-        error
-      );
+            [slug]:
+              product,
+          })
+        );
 
-      const message =
-        error instanceof Error
-          ? error.message
-          : String(error);
+        setProductName("");
+        setProductOldPrice("");
+        setProductDescription("");
+        setProductFeatures("");
+        setProductPrice1("");
+        setProductPrice2("");
+        setProductPrice3("");
+        setProductPrice6("");
+        setProductPriceYear("");
 
-      window.alert(
-        `Impossible de supprimer le produit.\n\n${message}`
-      );
-    }
-  };
+        window.alert(
+          "Produit ajouté avec succès ✅"
+        );
+      } catch (error) {
+        console.error(
+          "Erreur ajout produit:",
+          error
+        );
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : String(error);
+
+        window.alert(
+          `Impossible d'ajouter le produit.\n\n${message}`
+        );
+      }
+    };
 
   /* =========================================================
-     AJOUT PRODUIT SOCIAL
+     NORMAL PRODUCT - DELETE
+  ========================================================= */
+
+  const deleteProduct =
+    async (slug: string) => {
+      if (
+        !window.confirm(
+          "Supprimer ce produit ?"
+        )
+      ) {
+        return;
+      }
+
+      try {
+        await deleteProductFromDb(
+          slug
+        );
+
+        setProducts(
+          (previous) => {
+            const copy = {
+              ...previous,
+            };
+
+            delete copy[slug];
+
+            return copy;
+          }
+        );
+      } catch (error) {
+        console.error(
+          "Erreur suppression produit:",
+          error
+        );
+
+        window.alert(
+          "Impossible de supprimer le produit."
+        );
+      }
+    };
+
+  /* =========================================================
+     NORMAL PRODUCT - ACTIVE
+  ========================================================= */
+
+  const toggleProduct =
+    async (
+      slug: string,
+      active: boolean
+    ) => {
+      try {
+        await setProductActive(
+          slug,
+          active
+        );
+
+        setProducts(
+          (previous) => ({
+            ...previous,
+
+            [slug]: {
+              ...previous[slug],
+              active,
+            },
+          })
+        );
+      } catch (error) {
+        console.error(
+          "Erreur changement état produit:",
+          error
+        );
+      }
+    };
+
+  /* =========================================================
+     NORMAL PRODUCT - EDIT
+  ========================================================= */
+
+  const openEdit =
+    (slug: string) => {
+      const product =
+        products[slug];
+
+      if (!product) {
+        return;
+      }
+
+      setEditingSlug(slug);
+
+      setEditProduct({
+        ...product,
+
+        pricesByDuration: {
+          ...product.pricesByDuration,
+        },
+
+        features: [
+          ...(product.features ||
+            []),
+        ],
+      });
+    };
+
+  const closeEdit =
+    () => {
+      setEditingSlug(null);
+      setEditProduct(null);
+    };
+
+  const saveEdit =
+    async () => {
+      if (
+        !editingSlug ||
+        !editProduct
+      ) {
+        return;
+      }
+
+      if (
+        !editProduct.name.trim()
+      ) {
+        window.alert(
+          "Le nom du produit est obligatoire."
+        );
+        return;
+      }
+
+      try {
+        const updatedProduct: Subscription =
+          {
+            ...editProduct,
+
+            name:
+              editProduct.name.trim(),
+
+            oldPrice:
+              editProduct.oldPrice?.trim() ||
+              "",
+
+            description:
+              editProduct.description?.trim() ||
+              "",
+
+            category:
+              editProduct.category?.trim() ||
+              "",
+
+            features:
+              (
+                editProduct.features ||
+                []
+              )
+                .map((item) =>
+                  item.trim()
+                )
+                .filter(Boolean),
+
+            pricesByDuration: {
+              ...editProduct.pricesByDuration,
+            },
+          };
+
+        await updateProduct(
+          editingSlug,
+          updatedProduct,
+          updatedProduct.position
+        );
+
+        setProducts(
+          (previous) => ({
+            ...previous,
+
+            [editingSlug]:
+              updatedProduct,
+          })
+        );
+
+        closeEdit();
+
+        window.alert(
+          "Produit modifié avec succès ✅"
+        );
+      } catch (error) {
+        console.error(
+          "Erreur modification produit:",
+          error
+        );
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : String(error);
+
+        window.alert(
+          `Impossible de modifier le produit.\n\n${message}`
+        );
+      }
+    };
+
+  /* =========================================================
+     SOCIAL PRODUCT - ADD
   ========================================================= */
 
   const addSocialProduct =
     async () => {
-      if (
-        !socialName.trim()
-      ) {
+      if (!socialName.trim()) {
         window.alert(
           "Écris le nom du produit."
         );
@@ -712,16 +646,10 @@ function AdminPage() {
           )
         );
 
-      const oldPrice =
-        Number(
-          socialOldPrice.replace(
-            ",",
-            "."
-          )
-        );
-
       if (
-        !quantity ||
+        !Number.isFinite(
+          quantity
+        ) ||
         quantity <= 0
       ) {
         window.alert(
@@ -731,7 +659,7 @@ function AdminPage() {
       }
 
       if (
-        Number.isNaN(price) ||
+        !Number.isFinite(price) ||
         price < 0
       ) {
         window.alert(
@@ -753,18 +681,10 @@ function AdminPage() {
 
             price,
 
-            oldPrice:
-              Number.isNaN(
-                oldPrice
-              )
-                ? 0
-                : oldPrice,
-
             description:
               socialDescription.trim(),
 
-            active:
-              true,
+            active: true,
 
             position:
               Object.keys(
@@ -790,7 +710,6 @@ function AdminPage() {
         setSocialName("");
         setSocialQuantity("");
         setSocialPrice("");
-        setSocialOldPrice("");
         setSocialDescription("");
 
         window.alert(
@@ -814,79 +733,16 @@ function AdminPage() {
     };
 
   /* =========================================================
-     VISIBILITÉ PRODUIT SOCIAL
-  ========================================================= */
-
-  const toggleSocialProduct =
-    async (
-      id: string
-    ) => {
-      const product =
-        socialProducts[id];
-
-      if (!product) {
-        return;
-      }
-
-      const newActive =
-        !product.active;
-
-      try {
-        await setSocialProductActive(
-          id,
-          newActive
-        );
-
-        setSocialProducts(
-          (previous) => ({
-            ...previous,
-
-            [id]: {
-              ...previous[id],
-
-              active:
-                newActive,
-            },
-          })
-        );
-      } catch (error) {
-        console.error(
-          "Erreur changement état produit social:",
-          error
-        );
-
-        const message =
-          error instanceof Error
-            ? error.message
-            : String(error);
-
-        window.alert(
-          `Impossible de modifier l'état du produit.\n\n${message}`
-        );
-      }
-    };
-
-  /* =========================================================
-     SUPPRIMER PRODUIT SOCIAL
+     SOCIAL PRODUCT - DELETE
   ========================================================= */
 
   const deleteSocial =
-    async (
-      id: string
-    ) => {
-      const product =
-        socialProducts[id];
-
-      if (!product) {
-        return;
-      }
-
-      const confirmed =
-        window.confirm(
-          `Supprimer "${product.name}" ?`
-        );
-
-      if (!confirmed) {
+    async (id: string) => {
+      if (
+        !window.confirm(
+          "Supprimer ce produit social ?"
+        )
+      ) {
         return;
       }
 
@@ -897,22 +753,183 @@ function AdminPage() {
 
         setSocialProducts(
           (previous) => {
-            const updated = {
+            const copy = {
               ...previous,
             };
 
-            delete updated[id];
+            delete copy[id];
 
-            return updated;
+            return copy;
           }
-        );
-
-        window.alert(
-          "Produit social supprimé."
         );
       } catch (error) {
         console.error(
           "Erreur suppression produit social:",
+          error
+        );
+
+        window.alert(
+          "Impossible de supprimer le produit social."
+        );
+      }
+    };
+
+  /* =========================================================
+     SOCIAL PRODUCT - ACTIVE
+  ========================================================= */
+
+  const toggleSocial =
+    async (
+      id: string,
+      active: boolean
+    ) => {
+      try {
+        await setSocialProductActive(
+          id,
+          active
+        );
+
+        setSocialProducts(
+          (previous) => ({
+            ...previous,
+
+            [id]: {
+              ...previous[id],
+              active,
+            },
+          })
+        );
+      } catch (error) {
+        console.error(
+          "Erreur changement état produit social:",
+          error
+        );
+
+        window.alert(
+          "Impossible de modifier l'état du produit social."
+        );
+      }
+    };
+
+  /* =========================================================
+     SOCIAL PRODUCT - EDIT
+  ========================================================= */
+
+  const openSocialEdit =
+    (id: string) => {
+      const product =
+        socialProducts[id];
+
+      if (!product) {
+        return;
+      }
+
+      setEditingSocialId(id);
+
+      setEditSocialProduct({
+        ...product,
+      });
+    };
+
+  const closeSocialEdit =
+    () => {
+      setEditingSocialId(null);
+      setEditSocialProduct(null);
+    };
+
+  const saveSocialEdit =
+    async () => {
+      if (
+        !editingSocialId ||
+        !editSocialProduct
+      ) {
+        return;
+      }
+
+      const updatedProduct: SocialProduct =
+        {
+          ...editSocialProduct,
+
+          name:
+            editSocialProduct.name.trim(),
+
+          quantity:
+            Number(
+              editSocialProduct.quantity
+            ),
+
+          price:
+            Number(
+              editSocialProduct.price
+            ),
+
+          description:
+            editSocialProduct.description?.trim() ||
+            "",
+
+          active:
+            editSocialProduct.active,
+
+          position:
+            editSocialProduct.position ??
+            0,
+        };
+
+      if (!updatedProduct.name) {
+        window.alert(
+          "Le nom du produit est obligatoire."
+        );
+        return;
+      }
+
+      if (
+        !Number.isFinite(
+          updatedProduct.quantity
+        ) ||
+        updatedProduct.quantity <= 0
+      ) {
+        window.alert(
+          "La quantité doit être supérieure à 0."
+        );
+        return;
+      }
+
+      if (
+        !Number.isFinite(
+          updatedProduct.price
+        ) ||
+        updatedProduct.price < 0
+      ) {
+        window.alert(
+          "Le prix ne peut pas être négatif."
+        );
+        return;
+      }
+
+      try {
+        await updateSocialProduct(
+          editingSocialId,
+          updatedProduct,
+          updatedProduct.position
+        );
+
+        setSocialProducts(
+          (previous) => ({
+            ...previous,
+
+            [editingSocialId]:
+              updatedProduct,
+          })
+        );
+
+        closeSocialEdit();
+
+        window.alert(
+          "Produit social modifié avec succès ✅"
+        );
+      } catch (error) {
+        console.error(
+          "Erreur modification produit social:",
           error
         );
 
@@ -922,601 +939,287 @@ function AdminPage() {
             : String(error);
 
         window.alert(
-          `Impossible de supprimer le produit social.\n\n${message}`
+          `Impossible de modifier le produit social.\n\n${message}`
         );
       }
     };
 
   /* =========================================================
-     PAIEMENTS
+     LOGOUT
   ========================================================= */
 
-  const updatePaymentMethods =
-    (
-      updated: PaymentMethod[]
-    ) => {
-      setPaymentMethods(
-        updated
-      );
-
-      savePaymentMethods(
-        updated
-      );
-    };
-
-  const addPaymentMethod =
+  const logout =
     () => {
-      if (
-        !newPaymentName.trim() ||
-        !newPaymentDetails.trim()
-      ) {
-        window.alert(
-          "Remplis le nom et les détails."
-        );
-
-        return;
-      }
-
-      const newMethod:
-        PaymentMethod =
-        {
-          id:
-            Date.now().toString(),
-
-          name:
-            newPaymentName.trim(),
-
-          details:
-            newPaymentDetails.trim(),
-
-          active:
-            true,
-        };
-
-      updatePaymentMethods([
-        ...paymentMethods,
-        newMethod,
-      ]);
-
-      setNewPaymentName("");
-      setNewPaymentDetails("");
-    };
-
-  const updatePaymentMethod =
-    (
-      id: string,
-      field: keyof PaymentMethod,
-      value:
-        | string
-        | boolean
-    ) => {
-      const updated =
-        paymentMethods.map(
-          (method) =>
-            method.id === id
-              ? {
-                  ...method,
-
-                  [field]:
-                    value,
-                }
-              : method
-        );
-
-      updatePaymentMethods(
-        updated
+      localStorage.removeItem(
+        "adminAuth"
       );
-    };
 
-  const deletePaymentMethod =
-    (
-      id: string
-    ) => {
-      const confirmed =
-        window.confirm(
-          "Supprimer cette méthode de paiement ?"
-        );
-
-      if (!confirmed) {
-        return;
-      }
-
-      updatePaymentMethods(
-        paymentMethods.filter(
-          (method) =>
-            method.id !== id
-        )
-      );
-    };
-
-  /* =========================================================
-     CLIENTS
-  ========================================================= */
-
-  const updateClients =
-    (
-      updated: Client[]
-    ) => {
-      setClients(updated);
-      saveClients(updated);
-    };
-
-  const addClient =
-    () => {
-      if (
-        !newClient.name.trim() ||
-        !newClient.phone.trim()
-      ) {
-        window.alert(
-          "Nom et téléphone obligatoires."
-        );
-
-        return;
-      }
-
-      const client: Client =
-        {
-          id:
-            Date.now().toString(),
-
-          name:
-            newClient.name.trim(),
-
-          phone:
-            newClient.phone.trim(),
-
-          note:
-            newClient.note.trim(),
-
-          active:
-            true,
-        };
-
-      updateClients([
-        ...clients,
-        client,
-      ]);
-
-      setNewClient({
-        name: "",
-        phone: "",
-        note: "",
+      navigate({
+        to: "/admin-login",
       });
     };
-
-  const updateClient =
-    (
-      id: string,
-      field: keyof Client,
-      value:
-        | string
-        | boolean
-    ) => {
-      updateClients(
-        clients.map(
-          (client) =>
-            client.id === id
-              ? {
-                  ...client,
-
-                  [field]:
-                    value,
-                }
-              : client
-        )
-      );
-    };
-
-  const deleteClient =
-    (
-      id: string
-    ) => {
-      const confirmed =
-        window.confirm(
-          "Supprimer ce client ?"
-        );
-
-      if (!confirmed) {
-        return;
-      }
-
-      updateClients(
-        clients.filter(
-          (client) =>
-            client.id !== id
-        )
-      );
-    };
-
-  /* =========================================================
-     COMMANDES
-  ========================================================= */
-
-  const getOrders =
-    (): any[] => {
-      try {
-        const saved =
-          localStorage.getItem(
-            "orders"
-          );
-
-        if (!saved) {
-          return [];
-        }
-
-        const parsed =
-          JSON.parse(saved);
-
-        return Array.isArray(
-          parsed
-        )
-          ? parsed
-          : [];
-      } catch {
-        return [];
-      }
-    };
-
-  const orders =
-    getOrders();
-
-  const getClientOrders =
-    (
-      phone: string
-    ) => {
-      return orders.filter(
-        (order: any) =>
-          order.customer?.phone ===
-          phone
-      );
-    };
-
-  const clientMatchesFilters =
-    (
-      client: Client
-    ) => {
-      const clientOrders =
-        getClientOrders(
-          client.phone
-        );
-
-      return clientOrders.some(
-        (order: any) =>
-          order.items?.some(
-            (item: any) => {
-              const productMatch =
-                !productFilter ||
-                item.name
-                  ?.toLowerCase()
-                  .includes(
-                    productFilter.toLowerCase()
-                  );
-
-              const durationMatch =
-                !durationFilter ||
-                item.duration ===
-                  durationFilter;
-
-              return (
-                productMatch &&
-                durationMatch
-              );
-            }
-          )
-      );
-    };
-
-  /* =========================================================
-     STATISTIQUES
-  ========================================================= */
-
-  const totalProducts =
-    Object.keys(
-      products
-    ).length;
-
-  const visibleProducts =
-    Object.values(
-      products
-    ).filter(
-      (product) =>
-        product.active
-    ).length;
-
-  const hiddenProducts =
-    totalProducts -
-    visibleProducts;
-
-  const getCart =
-    (): any[] => {
-      try {
-        const saved =
-          localStorage.getItem(
-            "cart"
-          );
-
-        if (!saved) {
-          return [];
-        }
-
-        const parsed =
-          JSON.parse(saved);
-
-        return Array.isArray(
-          parsed
-        )
-          ? parsed
-          : [];
-      } catch {
-        return [];
-      }
-    };
-
-  const cart =
-    getCart();
-
-  const totalCartItems =
-    cart.reduce(
-      (
-        sum: number,
-        item: any
-      ) =>
-        sum +
-        Number(
-          item.quantity || 0
-        ),
-      0
-    );
-
-  const totalCartValue =
-    cart.reduce(
-      (
-        sum: number,
-        item: any
-      ) => {
-        const rawPrice =
-          String(
-            item.price ?? 0
-          )
-            .replace(
-              /DT/gi,
-              ""
-            )
-            .replace(
-              ",",
-              "."
-            )
-            .trim();
-
-        const price =
-          Number(
-            rawPrice
-          ) || 0;
-
-        const quantity =
-          Number(
-            item.quantity || 0
-          ) || 0;
-
-        return (
-          sum +
-          price *
-            quantity
-        );
-      },
-      0
-    );
 
   /* =========================================================
      RENDER
   ========================================================= */
 
   return (
-    <main className="min-h-screen bg-background px-4 py-10 text-foreground sm:px-6">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-screen bg-background">
 
-        {/* HEADER */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
 
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold">
-            Dashboard Admin
-          </h1>
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
 
-          <p className="mt-2 text-muted-foreground">
-            Gérez les produits,
-            clients, paiements
-            et produits sociaux.
-          </p>
-        </div>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
 
-        {/* NAVIGATION */}
+          <div>
+            <h1 className="text-2xl font-bold">
+              Administration
+            </h1>
 
-        <div className="mb-8 flex flex-wrap gap-3">
-
-          <Link
-            to="/"
-            hash="subscriptions"
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-primary-foreground transition hover:opacity-90"
-          >
-            <ShoppingBag className="h-4 w-4" />
-            Aller aux produits
-          </Link>
-
-          <Link
-            to="/admin/wheel"
-            className="inline-flex items-center gap-2 rounded-md border border-primary px-5 py-2 text-primary transition hover:bg-primary hover:text-primary-foreground"
-          >
-            <Gift className="h-4 w-4" />
-            Gestion de la roue
-          </Link>
-
-        </div>
-
-        {/* STATISTIQUES */}
-
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-
-          <div className="rounded-2xl border bg-card p-5">
             <p className="text-sm text-muted-foreground">
-              Total produits
+              Tunisia Digital Hub
             </p>
-
-            <h2 className="text-3xl font-bold">
-              {totalProducts}
-            </h2>
-          </div>
-
-          <div className="rounded-2xl border bg-card p-5">
-            <p className="text-sm text-muted-foreground">
-              Produits visibles
-            </p>
-
-            <h2 className="text-3xl font-bold text-green-500">
-              {visibleProducts}
-            </h2>
-          </div>
-
-          <div className="rounded-2xl border bg-card p-5">
-            <p className="text-sm text-muted-foreground">
-              Produits invisibles
-            </p>
-
-            <h2 className="text-3xl font-bold text-red-500">
-              {hiddenProducts}
-            </h2>
-          </div>
-
-          <div className="rounded-2xl border bg-card p-5">
-            <p className="text-sm text-muted-foreground">
-              Articles panier
-            </p>
-
-            <h2 className="text-3xl font-bold">
-              {totalCartItems}
-            </h2>
-          </div>
-
-          <div className="rounded-2xl border bg-card p-5">
-            <p className="text-sm text-muted-foreground">
-              Valeur panier
-            </p>
-
-            <h2 className="text-3xl font-bold">
-              {totalCartValue.toFixed(2)} DT
-            </h2>
-          </div>
-
-        </div>
-
-        {/* =====================================================
-            PRODUITS SOCIAUX
-        ===================================================== */}
-
-        <section className="mb-8 rounded-2xl border bg-card p-6">
-
-          <h2 className="mb-6 text-2xl font-bold">
-            Gestion Followers / Likes / Views
-          </h2>
-
-          <div className="mb-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-
-            <select
-              className="rounded-md border bg-background px-4 py-2"
-              value={socialType}
-              onChange={(event) =>
-                setSocialType(
-                  event.target.value as SocialProductType
-                )
-              }
-            >
-              <option value="followers">
-                Followers
-              </option>
-
-              <option value="likes">
-                Likes
-              </option>
-
-              <option value="views">
-                Views
-              </option>
-            </select>
-
-            <input
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Nom du produit"
-              value={socialName}
-              onChange={(event) =>
-                setSocialName(
-                  event.target.value
-                )
-              }
-            />
-
-            <input
-              type="number"
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Quantité"
-              value={socialQuantity}
-              onChange={(event) =>
-                setSocialQuantity(
-                  event.target.value
-                )
-              }
-            />
-
-            <input
-              type="number"
-              step="0.01"
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Prix"
-              value={socialPrice}
-              onChange={(event) =>
-                setSocialPrice(
-                  event.target.value
-                )
-              }
-            />
-
-            <input
-              type="number"
-              step="0.01"
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Ancien prix"
-              value={socialOldPrice}
-              onChange={(event) =>
-                setSocialOldPrice(
-                  event.target.value
-                )
-              }
-            />
-
-            <input
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Description"
-              value={socialDescription}
-              onChange={(event) =>
-                setSocialDescription(
-                  event.target.value
-                )
-              }
-            />
-
           </div>
 
           <button
             type="button"
-            onClick={addSocialProduct}
-            className="mb-8 rounded-md bg-primary px-5 py-2 text-primary-foreground"
+            onClick={logout}
+            className="rounded-md border px-4 py-2 text-sm font-medium transition hover:bg-muted"
           >
-            Ajouter produit social
+            Déconnexion
           </button>
 
-          <div className="overflow-x-auto rounded-2xl border">
+        </div>
 
-            <table className="min-w-[1000px] w-full text-left text-sm">
+      </header>
 
-              <thead className="bg-muted">
+      {/* =====================================================
+          CONTENT
+      ===================================================== */}
+
+      <div className="mx-auto max-w-7xl space-y-10 px-6 py-10">
+
+        {/* ===================================================
+            PRODUCTS
+        =================================================== */}
+
+        <section className="space-y-6">
+
+          <div>
+            <h2 className="text-2xl font-bold">
+              Produits
+            </h2>
+
+            <p className="text-sm text-muted-foreground">
+              Gestion des abonnements classiques.
+            </p>
+          </div>
+
+          {/* ADD PRODUCT */}
+
+          <div className="rounded-2xl border bg-card p-6 shadow-sm">
+
+            <h3 className="mb-5 text-xl font-semibold">
+              Ajouter un produit
+            </h3>
+
+            <div className="grid gap-4 md:grid-cols-2">
+
+              <input
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Nom du produit"
+                value={productName}
+                onChange={(event) =>
+                  setProductName(
+                    event.target.value
+                  )
+                }
+              />
+
+              <input
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Catégorie"
+                value={
+                  productCategory
+                }
+                onChange={(event) =>
+                  setProductCategory(
+                    event.target.value
+                  )
+                }
+              />
+
+              <input
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Ancien prix"
+                value={
+                  productOldPrice
+                }
+                onChange={(event) =>
+                  setProductOldPrice(
+                    event.target.value
+                  )
+                }
+              />
+
+              <select
+                className="rounded-md border bg-background px-4 py-2"
+                value={
+                  productDuration
+                }
+                onChange={(event) =>
+                  setProductDuration(
+                    event.target
+                      .value as Subscription["duration"]
+                  )
+                }
+              >
+                <option value="1 month">
+                  1 mois
+                </option>
+
+                <option value="2 months">
+                  2 mois
+                </option>
+
+                <option value="3 months">
+                  3 mois
+                </option>
+
+                <option value="6 months">
+                  6 mois
+                </option>
+
+                <option value="1 year">
+                  1 an
+                </option>
+              </select>
+
+              <input
+                type="number"
+                step="0.01"
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Prix 1 mois"
+                value={
+                  productPrice1
+                }
+                onChange={(event) =>
+                  setProductPrice1(
+                    event.target.value
+                  )
+                }
+              />
+
+              <input
+                type="number"
+                step="0.01"
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Prix 2 mois"
+                value={
+                  productPrice2
+                }
+                onChange={(event) =>
+                  setProductPrice2(
+                    event.target.value
+                  )
+                }
+              />
+
+              <input
+                type="number"
+                step="0.01"
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Prix 3 mois"
+                value={
+                  productPrice3
+                }
+                onChange={(event) =>
+                  setProductPrice3(
+                    event.target.value
+                  )
+                }
+              />
+
+              <input
+                type="number"
+                step="0.01"
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Prix 6 mois"
+                value={
+                  productPrice6
+                }
+                onChange={(event) =>
+                  setProductPrice6(
+                    event.target.value
+                  )
+                }
+              />
+
+              <input
+                type="number"
+                step="0.01"
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Prix 1 an"
+                value={
+                  productPriceYear
+                }
+                onChange={(event) =>
+                  setProductPriceYear(
+                    event.target.value
+                  )
+                }
+              />
+
+            </div>
+
+            <textarea
+              className="mt-4 min-h-28 w-full rounded-md border bg-background px-4 py-2"
+              placeholder="Description"
+              value={
+                productDescription
+              }
+              onChange={(event) =>
+                setProductDescription(
+                  event.target.value
+                )
+              }
+            />
+
+            <textarea
+              className="mt-4 min-h-28 w-full rounded-md border bg-background px-4 py-2"
+              placeholder="Fonctionnalités — une par ligne"
+              value={
+                productFeatures
+              }
+              onChange={(event) =>
+                setProductFeatures(
+                  event.target.value
+                )
+              }
+            />
+
+            <button
+              type="button"
+              onClick={
+                addProduct
+              }
+              className="mt-4 rounded-md bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:opacity-90"
+            >
+              Ajouter le produit
+            </button>
+
+          </div>
+
+          {/* PRODUCTS TABLE */}
+
+          <div className="overflow-x-auto rounded-2xl border bg-card">
+
+            <table className="w-full min-w-[900px] text-left">
+
+              <thead className="border-b bg-muted/50">
 
                 <tr>
 
@@ -1525,11 +1228,7 @@ function AdminPage() {
                   </th>
 
                   <th className="p-4">
-                    Type
-                  </th>
-
-                  <th className="p-4">
-                    Quantité
+                    Catégorie
                   </th>
 
                   <th className="p-4">
@@ -1554,70 +1253,70 @@ function AdminPage() {
 
               <tbody>
 
-                {socialLoading ? (
-
+                {loading ? (
                   <tr>
-
                     <td
-                      colSpan={7}
-                      className="p-6 text-center"
+                      colSpan={6}
+                      className="p-8 text-center text-muted-foreground"
                     >
                       Chargement...
                     </td>
-
                   </tr>
-
                 ) : Object.keys(
-                    socialProducts
+                    products
                   ).length === 0 ? (
-
                   <tr>
-
                     <td
-                      colSpan={7}
-                      className="p-6 text-center text-muted-foreground"
+                      colSpan={6}
+                      className="p-8 text-center text-muted-foreground"
                     >
-                      Aucun produit social.
+                      Aucun produit.
                     </td>
-
                   </tr>
-
                 ) : (
-
                   Object.entries(
-                    socialProducts
+                    products
                   ).map(
-                    ([id, product]) => (
-
+                    ([
+                      slug,
+                      product,
+                    ]) => (
                       <tr
-                        key={id}
-                        className="border-t"
+                        key={slug}
+                        className="border-b last:border-0"
                       >
 
                         <td className="p-4 font-medium">
-                          {product.name}
+                          {
+                            product.name
+                          }
                         </td>
 
                         <td className="p-4">
-
-                          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold">
-                            {product.type}
-                          </span>
-
+                          {
+                            product.category
+                          }
                         </td>
 
                         <td className="p-4">
-                          {Number(
-                            product.quantity
-                          ).toLocaleString()}
-                        </td>
-
-                        <td className="p-4 font-bold text-primary">
-                          {product.price} DT
+                          {Object.entries(
+                            product.pricesByDuration ||
+                              {}
+                          ).filter(
+                            ([, value]) =>
+                              Number(
+                                value
+                              ) > 0
+                          )[0]?.[1] ||
+                            "N/A"}{" "}
+                          DT
                         </td>
 
                         <td className="p-4 text-muted-foreground line-through">
-                          {product.oldPrice} DT
+                          {
+                            product.oldPrice
+                          }{" "}
+                          DT
                         </td>
 
                         <td className="p-4">
@@ -1625,44 +1324,59 @@ function AdminPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              toggleSocialProduct(
-                                id
+                              toggleProduct(
+                                slug,
+                                !product.active
                               )
                             }
-                            className={
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
                               product.active
-                                ? "rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white"
-                                : "rounded-full bg-gray-500 px-3 py-1 text-xs font-bold text-white"
-                            }
+                                ? "bg-green-500/10 text-green-600"
+                                : "bg-red-500/10 text-red-600"
+                            }`}
                           >
                             {product.active
-                              ? "Visible"
-                              : "Invisible"}
+                              ? "Actif"
+                              : "Masqué"}
                           </button>
 
                         </td>
 
                         <td className="p-4">
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              deleteSocial(
-                                id
-                              )
-                            }
-                            className="rounded-md bg-destructive px-3 py-2 text-xs text-destructive-foreground"
-                          >
-                            Supprimer
-                          </button>
+                          <div className="flex gap-2">
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openEdit(
+                                  slug
+                                )
+                              }
+                              className="rounded-md border px-3 py-1.5 text-sm transition hover:bg-muted"
+                            >
+                              Modifier
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                deleteProduct(
+                                  slug
+                                )
+                              }
+                              className="rounded-md border border-red-500/30 px-3 py-1.5 text-sm text-red-600 transition hover:bg-red-500/10"
+                            >
+                              Supprimer
+                            </button>
+
+                          </div>
 
                         </td>
 
                       </tr>
-
                     )
                   )
-
                 )}
 
               </tbody>
@@ -1673,312 +1387,146 @@ function AdminPage() {
 
         </section>
 
-        {/* =====================================================
-            PRODUITS NORMAUX
-        ===================================================== */}
+        {/* ===================================================
+            SOCIAL MEDIA
+        =================================================== */}
 
-        <section className="mb-8 rounded-2xl border bg-card p-6">
+        <section className="space-y-6">
 
-          <h2 className="mb-4 text-2xl font-bold">
-            Gestion des produits
-          </h2>
+          <div>
+            <h2 className="text-2xl font-bold">
+              Social Media
+            </h2>
 
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-
-            <input
-              className="w-full rounded-md border bg-background px-4 py-2"
-              placeholder="Nom du nouveau produit"
-              value={newName}
-              onChange={(event) =>
-                setNewName(
-                  event.target.value
-                )
-              }
-            />
-
-            <button
-              type="button"
-              onClick={addProduct}
-              className="rounded-md bg-primary px-5 py-2 text-primary-foreground"
-            >
-              Ajouter
-            </button>
-
+            <p className="text-sm text-muted-foreground">
+              Gestion des services Followers,
+              Likes et Views.
+            </p>
           </div>
 
-          {productsLoading && (
+          {/* ADD SOCIAL PRODUCT */}
 
-            <div className="rounded-2xl border p-6 text-center text-muted-foreground">
-              Chargement des produits depuis Supabase...
-            </div>
+          <div className="rounded-2xl border bg-card p-6 shadow-sm">
 
-          )}
+            <h3 className="mb-5 text-xl font-semibold">
+              Ajouter un produit Social Media
+            </h3>
 
-          {productsError && (
+            <div className="grid gap-4 md:grid-cols-2">
 
-            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-6 text-center text-destructive">
-              {productsError}
-            </div>
+              <input
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Nom du produit"
+                value={
+                  socialName
+                }
+                onChange={(event) =>
+                  setSocialName(
+                    event.target.value
+                  )
+                }
+              />
 
-          )}
+              <select
+                className="rounded-md border bg-background px-4 py-2"
+                value={
+                  socialType
+                }
+                onChange={(event) =>
+                  setSocialType(
+                    event.target
+                      .value as SocialProductType
+                  )
+                }
+              >
 
-          {!productsLoading &&
-            !productsError && (
+                <option value="followers">
+                  Followers
+                </option>
 
-              <div className="overflow-x-auto rounded-2xl border">
+                <option value="likes">
+                  Likes
+                </option>
 
-                <table className="min-w-[900px] w-full text-left text-sm">
+                <option value="views">
+                  Views
+                </option>
 
-                  <thead className="bg-muted">
+              </select>
 
-                    <tr>
+              <input
+                type="number"
+                min="1"
+                className="rounded-md border bg-background px-4 py-2"
+                placeholder="Quantité"
+                value={
+                  socialQuantity
+                }
+                onChange={(event) =>
+                  setSocialQuantity(
+                    event.target.value
+                  )
+                }
+              />
 
-                      <th className="p-4">
-                        Nom
-                      </th>
+              <div className="flex items-center gap-2">
 
-                      <th className="p-4">
-                        Prix 1 mois
-                      </th>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="w-full rounded-md border bg-background px-4 py-2"
+                  placeholder="Prix"
+                  value={
+                    socialPrice
+                  }
+                  onChange={(event) =>
+                    setSocialPrice(
+                      event.target.value
+                    )
+                  }
+                />
 
-                      <th className="p-4">
-                        Ancien prix
-                      </th>
-
-                      <th className="p-4">
-                        Catégorie
-                      </th>
-
-                      <th className="p-4">
-                        État
-                      </th>
-
-                      <th className="p-4">
-                        Actions
-                      </th>
-
-                    </tr>
-
-                  </thead>
-
-                  <tbody>
-
-                    {Object.entries(
-                      products
-                    ).map(
-                      ([slug, product]) => (
-
-                        <tr
-                          key={slug}
-                          className="border-t"
-                        >
-
-                          <td className="p-4 font-medium">
-                            {product.name}
-                          </td>
-
-                          <td className="p-4 font-bold text-primary">
-                            {
-                              product
-                                .pricesByDuration?.[
-                                "1 month"
-                              ] || "0 DT"
-                            }
-                          </td>
-
-                          <td className="p-4 text-muted-foreground line-through">
-                            {product.oldPrice}
-                          </td>
-
-                          <td className="p-4">
-                            {product.category}
-                          </td>
-
-                          <td className="p-4">
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                toggleVisible(
-                                  slug
-                                )
-                              }
-                              className={
-                                product.active
-                                  ? "rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white"
-                                  : "rounded-full bg-gray-500 px-3 py-1 text-xs font-bold text-white"
-                              }
-                            >
-                              {product.active
-                                ? "Visible"
-                                : "Invisible"}
-                            </button>
-
-                          </td>
-
-                          <td className="p-4">
-
-                            <div className="flex gap-2">
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openEdit(
-                                    slug
-                                  )
-                                }
-                                className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground"
-                              >
-                                Modifier
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  deleteProduct(
-                                    slug
-                                  )
-                                }
-                                className="rounded-md bg-destructive px-3 py-2 text-xs text-destructive-foreground"
-                              >
-                                Supprimer
-                              </button>
-
-                            </div>
-
-                          </td>
-
-                        </tr>
-                      )
-                    )}
-
-                  </tbody>
-
-                </table>
+                <span className="font-bold">
+                  DT
+                </span>
 
               </div>
 
-            )}
+            </div>
 
-        </section>
-
-        {/* =====================================================
-            CLIENTS
-        ===================================================== */}
-
-        <section className="mb-8 rounded-2xl border bg-card p-6">
-
-          <h2 className="mb-4 text-2xl font-bold">
-            Gestion des clients
-          </h2>
-
-          <div className="mb-4 grid gap-3 md:grid-cols-3">
-
-            <input
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Nom"
-              value={newClient.name}
-              onChange={(event) =>
-                setNewClient({
-                  ...newClient,
-                  name:
-                    event.target.value,
-                })
+            <textarea
+              className="mt-4 min-h-28 w-full rounded-md border bg-background px-4 py-2"
+              placeholder="Description du service social..."
+              value={
+                socialDescription
               }
-            />
-
-            <input
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Téléphone"
-              value={newClient.phone}
               onChange={(event) =>
-                setNewClient({
-                  ...newClient,
-                  phone:
-                    event.target.value,
-                })
+                setSocialDescription(
+                  event.target.value
+                )
               }
             />
 
             <button
               type="button"
-              onClick={addClient}
-              className="rounded-md bg-primary px-5 py-2 text-primary-foreground"
+              onClick={
+                addSocialProduct
+              }
+              className="mt-4 rounded-md bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:opacity-90"
             >
-              Ajouter client
+              Ajouter le produit social
             </button>
 
           </div>
 
-          <textarea
-            className="mb-6 w-full rounded-md border bg-background px-4 py-2"
-            placeholder="Note client"
-            value={newClient.note}
-            onChange={(event) =>
-              setNewClient({
-                ...newClient,
-                note:
-                  event.target.value,
-              })
-            }
-          />
+          {/* SOCIAL PRODUCTS TABLE */}
 
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+          <div className="overflow-x-auto rounded-2xl border bg-card">
 
-            <input
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Produit, ex. ChatGPT"
-              value={productFilter}
-              onChange={(event) =>
-                setProductFilter(
-                  event.target.value
-                )
-              }
-            />
+            <table className="w-full min-w-[900px] text-left">
 
-            <select
-              className="rounded-md border bg-background px-4 py-2"
-              value={durationFilter}
-              onChange={(event) =>
-                setDurationFilter(
-                  event.target.value
-                )
-              }
-            >
-
-              <option value="">
-                Toutes les durées
-              </option>
-
-              <option value="1 month">
-                1 mois
-              </option>
-
-              <option value="2 months">
-                2 mois
-              </option>
-
-              <option value="3 months">
-                3 mois
-              </option>
-
-              <option value="6 months">
-                6 mois
-              </option>
-
-              <option value="1 year">
-                1 an
-              </option>
-
-            </select>
-
-          </div>
-
-          <div className="overflow-x-auto rounded-2xl border">
-
-            <table className="min-w-[900px] w-full text-left text-sm">
-
-              <thead className="bg-muted">
+              <thead className="border-b bg-muted/50">
 
                 <tr>
 
@@ -1987,11 +1535,15 @@ function AdminPage() {
                   </th>
 
                   <th className="p-4">
-                    Téléphone
+                    Type
                   </th>
 
                   <th className="p-4">
-                    Commandes
+                    Quantité
+                  </th>
+
+                  <th className="p-4">
+                    Prix
                   </th>
 
                   <th className="p-4">
@@ -1999,7 +1551,7 @@ function AdminPage() {
                   </th>
 
                   <th className="p-4">
-                    Action
+                    Actions
                   </th>
 
                 </tr>
@@ -2008,131 +1560,62 @@ function AdminPage() {
 
               <tbody>
 
-                {clients
-                  .filter(
-                    (client) =>
-                      !productFilter &&
-                      !durationFilter
-                        ? true
-                        : clientMatchesFilters(
-                            client
-                          )
-                  )
-                  .map(
-                    (client) => (
-
+                {socialLoading ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="p-8 text-center text-muted-foreground"
+                    >
+                      Chargement...
+                    </td>
+                  </tr>
+                ) : Object.keys(
+                    socialProducts
+                  ).length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="p-8 text-center text-muted-foreground"
+                    >
+                      Aucun produit social.
+                    </td>
+                  </tr>
+                ) : (
+                  Object.entries(
+                    socialProducts
+                  ).map(
+                    ([
+                      id,
+                      product,
+                    ]) => (
                       <tr
-                        key={client.id}
-                        className="border-t"
+                        key={id}
+                        className="border-b last:border-0"
                       >
 
-                        <td className="p-4">
+                        <td className="p-4 font-medium">
+                          {
+                            product.name
+                          }
+                        </td>
 
-                          <input
-                            className="w-full rounded-md border bg-background px-3 py-2"
-                            value={
-                              client.name
-                            }
-                            onChange={(
-                              event
-                            ) =>
-                              updateClient(
-                                client.id,
-                                "name",
-                                event.target
-                                  .value
-                              )
-                            }
-                          />
-
+                        <td className="p-4 capitalize">
+                          {
+                            product.type
+                          }
                         </td>
 
                         <td className="p-4">
-
-                          <input
-                            className="w-full rounded-md border bg-background px-3 py-2"
-                            value={
-                              client.phone
-                            }
-                            onChange={(
-                              event
-                            ) =>
-                              updateClient(
-                                client.id,
-                                "phone",
-                                event.target
-                                  .value
-                              )
-                            }
-                          />
-
+                          {
+                            product.quantity
+                          }
                         </td>
 
                         <td className="p-4">
-
-                          {getClientOrders(
-                            client.phone
-                          ).length === 0 ? (
-
-                            <span className="text-muted-foreground">
-                              Aucune commande
-                            </span>
-
-                          ) : (
-
-                            <div className="max-h-40 space-y-2 overflow-auto">
-
-                              {getClientOrders(
-                                client.phone
-                              ).map(
-                                (
-                                  order: any
-                                ) => (
-
-                                  <div
-                                    key={
-                                      order.id
-                                    }
-                                    className="rounded-md border bg-muted/30 p-2 text-xs"
-                                  >
-
-                                    <div className="font-bold text-primary">
-                                      {
-                                        order.total
-                                      }{" "}
-                                      DT
-                                    </div>
-
-                                    {order.items?.map(
-                                      (
-                                        item: any,
-                                        itemIndex: number
-                                      ) => (
-
-                                        <div
-                                          key={`${item.slug}-${itemIndex}`}
-                                        >
-                                          {
-                                            item.name
-                                          }{" "}
-                                          ×{" "}
-                                          {
-                                            item.quantity
-                                          }
-                                        </div>
-
-                                      )
-                                    )}
-
-                                  </div>
-
-                                )
-                              )}
-
-                            </div>
-
-                          )}
-
+                          {
+                            product.price
+                          }{" "}
+                          DT
                         </td>
 
                         <td className="p-4">
@@ -2140,45 +1623,60 @@ function AdminPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              updateClient(
-                                client.id,
-                                "active",
-                                !client.active
+                              toggleSocial(
+                                id,
+                                !product.active
                               )
                             }
-                            className={
-                              client.active
-                                ? "rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white"
-                                : "rounded-full bg-gray-500 px-3 py-1 text-xs font-bold text-white"
-                            }
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              product.active
+                                ? "bg-green-500/10 text-green-600"
+                                : "bg-red-500/10 text-red-600"
+                            }`}
                           >
-                            {client.active
+                            {product.active
                               ? "Actif"
-                              : "Inactif"}
+                              : "Masqué"}
                           </button>
 
                         </td>
 
                         <td className="p-4">
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              deleteClient(
-                                client.id
-                              )
-                            }
-                            className="rounded-md bg-destructive px-3 py-2 text-xs text-destructive-foreground"
-                          >
-                            Supprimer
-                          </button>
+                          <div className="flex gap-2">
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openSocialEdit(
+                                  id
+                                )
+                              }
+                              className="rounded-md border px-3 py-1.5 text-sm transition hover:bg-muted"
+                            >
+                              Modifier
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                deleteSocial(
+                                  id
+                                )
+                              }
+                              className="rounded-md border border-red-500/30 px-3 py-1.5 text-sm text-red-600 transition hover:bg-red-500/10"
+                            >
+                              Supprimer
+                            </button>
+
+                          </div>
 
                         </td>
 
                       </tr>
-
                     )
-                  )}
+                  )
+                )}
 
               </tbody>
 
@@ -2188,57 +1686,27 @@ function AdminPage() {
 
         </section>
 
-        {/* =====================================================
-            PAIEMENTS
-        ===================================================== */}
+        {/* ===================================================
+            CLIENTS
+        =================================================== */}
 
-        <section className="mb-8 rounded-2xl border bg-card p-6">
+        <section className="space-y-4">
 
-          <h2 className="mb-4 text-2xl font-bold">
-            Méthodes de paiement
-          </h2>
+          <div>
+            <h2 className="text-2xl font-bold">
+              Clients
+            </h2>
 
-          <div className="mb-6 grid gap-3 md:grid-cols-3">
-
-            <input
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Nom, ex. D17"
-              value={newPaymentName}
-              onChange={(event) =>
-                setNewPaymentName(
-                  event.target.value
-                )
-              }
-            />
-
-            <input
-              className="rounded-md border bg-background px-4 py-2"
-              placeholder="Numéro, RIB ou adresse"
-              value={newPaymentDetails}
-              onChange={(event) =>
-                setNewPaymentDetails(
-                  event.target.value
-                )
-              }
-            />
-
-            <button
-              type="button"
-              onClick={
-                addPaymentMethod
-              }
-              className="rounded-md bg-primary px-5 py-2 text-primary-foreground"
-            >
-              Ajouter méthode
-            </button>
-
+            <p className="text-sm text-muted-foreground">
+              Clients enregistrés.
+            </p>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border">
+          <div className="overflow-x-auto rounded-2xl border bg-card">
 
-            <table className="min-w-[700px] w-full text-left text-sm">
+            <table className="w-full text-left">
 
-              <thead className="bg-muted">
+              <thead className="border-b bg-muted/50">
 
                 <tr>
 
@@ -2247,15 +1715,11 @@ function AdminPage() {
                   </th>
 
                   <th className="p-4">
-                    Détails
+                    Email
                   </th>
 
                   <th className="p-4">
-                    État
-                  </th>
-
-                  <th className="p-4">
-                    Action
+                    Téléphone
                   </th>
 
                 </tr>
@@ -2264,100 +1728,147 @@ function AdminPage() {
 
               <tbody>
 
-                {paymentMethods.map(
-                  (method) => (
-
-                    <tr
-                      key={
-                        method.id
-                      }
-                      className="border-t"
+                {clients.length ===
+                0 ? (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="p-8 text-center text-muted-foreground"
                     >
+                      Aucun client.
+                    </td>
+                  </tr>
+                ) : (
+                  clients.map(
+                    (
+                      client,
+                      index
+                    ) => (
+                      <tr
+                        key={
+                          client.id ??
+                          index
+                        }
+                        className="border-b last:border-0"
+                      >
 
-                      <td className="p-4">
+                        <td className="p-4">
+                          {
+                            client.name
+                          }
+                        </td>
 
-                        <input
-                          className="w-full rounded-md border bg-background px-3 py-2"
-                          value={
+                        <td className="p-4">
+                          {
+                            client.email
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {
+                            client.phone
+                          }
+                        </td>
+
+                      </tr>
+                    )
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </section>
+
+        {/* ===================================================
+            PAYMENT METHODS
+        =================================================== */}
+
+        <section className="space-y-4">
+
+          <div>
+            <h2 className="text-2xl font-bold">
+              Moyens de paiement
+            </h2>
+
+            <p className="text-sm text-muted-foreground">
+              Gestion des moyens de paiement.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border bg-card">
+
+            <table className="w-full text-left">
+
+              <thead className="border-b bg-muted/50">
+
+                <tr>
+
+                  <th className="p-4">
+                    Nom
+                  </th>
+
+                  <th className="p-4">
+                    État
+                  </th>
+
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                {paymentMethods.length ===
+                0 ? (
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="p-8 text-center text-muted-foreground"
+                    >
+                      Aucun moyen de paiement.
+                    </td>
+                  </tr>
+                ) : (
+                  paymentMethods.map(
+                    (
+                      method,
+                      index
+                    ) => (
+                      <tr
+                        key={
+                          method.id ??
+                          index
+                        }
+                        className="border-b last:border-0"
+                      >
+
+                        <td className="p-4 font-medium">
+                          {
                             method.name
                           }
-                          onChange={(
-                            event
-                          ) =>
-                            updatePaymentMethod(
-                              method.id,
-                              "name",
-                              event.target
-                                .value
-                            )
-                          }
-                        />
+                        </td>
 
-                      </td>
+                        <td className="p-4">
 
-                      <td className="p-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              method.active
+                                ? "bg-green-500/10 text-green-600"
+                                : "bg-red-500/10 text-red-600"
+                            }`}
+                          >
+                            {method.active
+                              ? "Actif"
+                              : "Inactif"}
+                          </span>
 
-                        <input
-                          className="w-full rounded-md border bg-background px-3 py-2"
-                          value={
-                            method.details
-                          }
-                          onChange={(
-                            event
-                          ) =>
-                            updatePaymentMethod(
-                              method.id,
-                              "details",
-                              event.target
-                                .value
-                            )
-                          }
-                        />
+                        </td>
 
-                      </td>
-
-                      <td className="p-4">
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updatePaymentMethod(
-                              method.id,
-                              "active",
-                              !method.active
-                            )
-                          }
-                          className={
-                            method.active
-                              ? "rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white"
-                              : "rounded-full bg-gray-500 px-3 py-1 text-xs font-bold text-white"
-                          }
-                        >
-                          {method.active
-                            ? "Active"
-                            : "Inactive"}
-                        </button>
-
-                      </td>
-
-                      <td className="p-4">
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            deletePaymentMethod(
-                              method.id
-                            )
-                          }
-                          className="rounded-md bg-destructive px-3 py-2 text-xs text-destructive-foreground"
-                        >
-                          Supprimer
-                        </button>
-
-                      </td>
-
-                    </tr>
-
+                      </tr>
+                    )
                   )
                 )}
 
@@ -2372,7 +1883,7 @@ function AdminPage() {
       </div>
 
       {/* =====================================================
-          MODAL MODIFICATION PRODUIT
+          NORMAL PRODUCT EDIT MODAL
       ===================================================== */}
 
       {editingSlug &&
@@ -2380,23 +1891,22 @@ function AdminPage() {
 
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
 
-            <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl bg-background p-6 shadow-xl">
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-2xl bg-background p-6 shadow-xl">
 
               <h2 className="mb-2 text-2xl font-bold">
                 Modifier le produit
               </h2>
 
               <p className="mb-6 text-sm text-muted-foreground">
-                Modifie les informations et les prix de chaque durée.
+                Modifie les informations du produit.
               </p>
 
               <div className="grid gap-4">
 
-                {/* NOM */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
-                    Nom du produit
+                    Nom
                   </label>
 
                   <input
@@ -2413,27 +1923,47 @@ function AdminPage() {
                             .value,
                       })
                     }
-                    placeholder="Nom"
                   />
+
                 </div>
 
-                {/* ANCIEN PRIX */}
+                <div className="grid gap-4 md:grid-cols-2">
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Ancien prix
-                  </label>
+                  <div>
 
-                  <div className="flex items-center gap-2">
+                    <label className="mb-1 block text-sm font-medium">
+                      Catégorie
+                    </label>
 
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
                       className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
+                      value={
+                        editProduct.category
+                      }
+                      onChange={(event) =>
+                        setEditProduct({
+                          ...editProduct,
+
+                          category:
+                            event.target
+                              .value,
+                        })
+                      }
+                    />
+
+                  </div>
+
+                  <div>
+
+                    <label className="mb-1 block text-sm font-medium">
+                      Ancien prix
+                    </label>
+
+                    <input
+                      className="w-full rounded-md border bg-background px-4 py-2"
+                      value={
                         editProduct.oldPrice
-                      )}
+                      }
                       onChange={(event) =>
                         setEditProduct({
                           ...editProduct,
@@ -2443,270 +1973,20 @@ function AdminPage() {
                               .value,
                         })
                       }
-                      placeholder="100"
                     />
 
-                    <span className="font-bold">
-                      DT
-                    </span>
-
                   </div>
+
                 </div>
 
-                {/* PRIX 1 MOIS */}
-
                 <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 1 mois
-                  </label>
 
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "1 month"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "1 month":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="30"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* PRIX 2 MOIS */}
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 2 mois
-                  </label>
-
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "2 months"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "2 months":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="55"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* PRIX 3 MOIS */}
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 3 mois
-                  </label>
-
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "3 months"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "3 months":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="75"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* PRIX 6 MOIS */}
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 6 mois
-                  </label>
-
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "6 months"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "6 months":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="100"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* PRIX 1 AN */}
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 1 an
-                  </label>
-
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "1 year"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "1 year":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="180"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* CATÉGORIE */}
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Catégorie
-                  </label>
-
-                  <input
-                    className="w-full rounded-md border bg-background px-4 py-2"
-                    value={
-                      editProduct.category
-                    }
-                    onChange={(event) =>
-                      setEditProduct({
-                        ...editProduct,
-
-                        category:
-                          event.target
-                            .value,
-                      })
-                    }
-                    placeholder="AI Tools"
-                  />
-                </div>
-
-                {/* DESCRIPTION */}
-
-                <div>
                   <label className="mb-1 block text-sm font-medium">
                     Description
                   </label>
 
                   <textarea
-                    className="min-h-24 w-full rounded-md border bg-background px-4 py-2"
+                    className="min-h-28 w-full rounded-md border bg-background px-4 py-2"
                     value={
                       editProduct.description
                     }
@@ -2719,24 +1999,105 @@ function AdminPage() {
                             .value,
                       })
                     }
-                    placeholder="Description du produit"
                   />
+
                 </div>
 
-                {/* FEATURES */}
+                <div>
+
+                  <label className="mb-2 block text-sm font-medium">
+                    Prix par durée
+                  </label>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+
+                    {(
+                      [
+                        [
+                          "1 month",
+                          "1 mois",
+                        ],
+                        [
+                          "2 months",
+                          "2 mois",
+                        ],
+                        [
+                          "3 months",
+                          "3 mois",
+                        ],
+                        [
+                          "6 months",
+                          "6 mois",
+                        ],
+                        [
+                          "1 year",
+                          "1 an",
+                        ],
+                      ] as const
+                    ).map(
+                      ([
+                        key,
+                        label,
+                      ]) => (
+                        <div
+                          key={key}
+                        >
+
+                          <label className="mb-1 block text-xs text-muted-foreground">
+                            {
+                              label
+                            }
+                          </label>
+
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="w-full rounded-md border bg-background px-4 py-2"
+                            value={
+                              editProduct
+                                .pricesByDuration?.[
+                                key
+                              ] ?? ""
+                            }
+                            onChange={(
+                              event
+                            ) =>
+                              setEditProduct({
+                                ...editProduct,
+
+                                pricesByDuration:
+                                  {
+                                    ...editProduct.pricesByDuration,
+
+                                    [key]:
+                                      event
+                                        .target
+                                        .value,
+                                  },
+                              })
+                            }
+                          />
+
+                        </div>
+                      )
+                    )}
+
+                  </div>
+
+                </div>
 
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Fonctionnalités
                   </label>
 
                   <textarea
-                    className="min-h-32 w-full rounded-md border bg-background px-4 py-2"
-                    value={
-                      editProduct.features.join(
-                        "\n"
-                      )
-                    }
+                    className="min-h-28 w-full rounded-md border bg-background px-4 py-2"
+                    value={(
+                      editProduct.features ||
+                      []
+                    ).join("\n")}
                     onChange={(event) =>
                       setEditProduct({
                         ...editProduct,
@@ -2744,19 +2105,20 @@ function AdminPage() {
                         features:
                           event.target.value
                             .split("\n")
+                            .map(
+                              (item) =>
+                                item.trim()
+                            )
                             .filter(
-                              (feature) =>
-                                feature.trim()
+                              Boolean
                             ),
                       })
                     }
-                    placeholder="Une fonctionnalité par ligne"
                   />
+
                 </div>
 
-                {/* VISIBILITÉ */}
-
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border p-3">
+                <label className="flex cursor-pointer items-center gap-3 rounded-md border p-3">
 
                   <input
                     type="checkbox"
@@ -2782,13 +2144,13 @@ function AdminPage() {
 
               </div>
 
-              {/* BOUTONS */}
-
               <div className="mt-6 flex justify-end gap-3">
 
                 <button
                   type="button"
-                  onClick={closeEdit}
+                  onClick={
+                    closeEdit
+                  }
                   className="rounded-md border px-4 py-2 transition hover:bg-muted"
                 >
                   Annuler
@@ -2796,7 +2158,255 @@ function AdminPage() {
 
                 <button
                   type="button"
-                  onClick={saveEdit}
+                  onClick={
+                    saveEdit
+                  }
+                  className="rounded-md bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:opacity-90"
+                >
+                  Enregistrer
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+      {/* =====================================================
+          SOCIAL PRODUCT EDIT MODAL
+      ===================================================== */}
+
+      {editingSocialId &&
+        editSocialProduct && (
+
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4">
+
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl bg-background p-6 shadow-xl">
+
+              <h2 className="mb-2 text-2xl font-bold">
+                Modifier le produit social
+              </h2>
+
+              <p className="mb-6 text-sm text-muted-foreground">
+                Modifie le nom, le type, la quantité,
+                le prix et la description.
+              </p>
+
+              <div className="grid gap-4">
+
+                {/* NAME */}
+
+                <div>
+
+                  <label className="mb-1 block text-sm font-medium">
+                    Nom du produit
+                  </label>
+
+                  <input
+                    className="w-full rounded-md border bg-background px-4 py-2"
+                    value={
+                      editSocialProduct.name
+                    }
+                    onChange={(event) =>
+                      setEditSocialProduct({
+                        ...editSocialProduct,
+
+                        name:
+                          event.target
+                            .value,
+                      })
+                    }
+                    placeholder="Ex: Instagram Followers"
+                  />
+
+                </div>
+
+                {/* TYPE */}
+
+                <div>
+
+                  <label className="mb-1 block text-sm font-medium">
+                    Type
+                  </label>
+
+                  <select
+                    className="w-full rounded-md border bg-background px-4 py-2"
+                    value={
+                      editSocialProduct.type
+                    }
+                    onChange={(event) =>
+                      setEditSocialProduct({
+                        ...editSocialProduct,
+
+                        type:
+                          event.target
+                            .value as SocialProductType,
+                      })
+                    }
+                  >
+
+                    <option value="followers">
+                      Followers
+                    </option>
+
+                    <option value="likes">
+                      Likes
+                    </option>
+
+                    <option value="views">
+                      Views
+                    </option>
+
+                  </select>
+
+                </div>
+
+                {/* QUANTITY */}
+
+                <div>
+
+                  <label className="mb-1 block text-sm font-medium">
+                    Quantité
+                  </label>
+
+                  <input
+                    type="number"
+                    min="1"
+                    className="w-full rounded-md border bg-background px-4 py-2"
+                    value={
+                      editSocialProduct.quantity
+                    }
+                    onChange={(event) =>
+                      setEditSocialProduct({
+                        ...editSocialProduct,
+
+                        quantity:
+                          Number(
+                            event.target
+                              .value
+                          ),
+                      })
+                    }
+                    placeholder="1000"
+                  />
+
+                </div>
+
+                {/* PRICE */}
+
+                <div>
+
+                  <label className="mb-1 block text-sm font-medium">
+                    Prix
+                  </label>
+
+                  <div className="flex items-center gap-2">
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded-md border bg-background px-4 py-2"
+                      value={
+                        editSocialProduct.price
+                      }
+                      onChange={(event) =>
+                        setEditSocialProduct({
+                          ...editSocialProduct,
+
+                          price:
+                            Number(
+                              event.target
+                                .value
+                            ),
+                        })
+                      }
+                      placeholder="10"
+                    />
+
+                    <span className="font-bold">
+                      DT
+                    </span>
+
+                  </div>
+
+                </div>
+
+                {/* DESCRIPTION */}
+
+                <div>
+
+                  <label className="mb-1 block text-sm font-medium">
+                    Description
+                  </label>
+
+                  <textarea
+                    className="min-h-28 w-full rounded-md border bg-background px-4 py-2"
+                    value={
+                      editSocialProduct.description
+                    }
+                    onChange={(event) =>
+                      setEditSocialProduct({
+                        ...editSocialProduct,
+
+                        description:
+                          event.target
+                            .value,
+                      })
+                    }
+                    placeholder="Description du service social..."
+                  />
+
+                </div>
+
+                {/* ACTIVE */}
+
+                <label className="flex cursor-pointer items-center gap-3 rounded-md border p-3">
+
+                  <input
+                    type="checkbox"
+                    checked={
+                      editSocialProduct.active
+                    }
+                    onChange={(event) =>
+                      setEditSocialProduct({
+                        ...editSocialProduct,
+
+                        active:
+                          event.target
+                            .checked,
+                      })
+                    }
+                  />
+
+                  <span>
+                    Produit visible
+                  </span>
+
+                </label>
+
+              </div>
+
+              {/* BUTTONS */}
+
+              <div className="mt-6 flex justify-end gap-3">
+
+                <button
+                  type="button"
+                  onClick={
+                    closeSocialEdit
+                  }
+                  className="rounded-md border px-4 py-2 transition hover:bg-muted"
+                >
+                  Annuler
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    saveSocialEdit
+                  }
                   className="rounded-md bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:opacity-90"
                 >
                   Enregistrer
