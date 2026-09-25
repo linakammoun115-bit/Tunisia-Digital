@@ -12,6 +12,9 @@ import {
 import {
   Gift,
   ShoppingBag,
+  Package,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -45,6 +48,16 @@ import {
   type PaymentMethod,
 } from "@/lib/paymentMethods";
 
+import {
+  getPacks,
+  createPack,
+  updatePack,
+  deletePack,
+  setPackActive,
+  type Pack,
+  type PackProduct,
+} from "@/lib/packs";
+
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
@@ -53,7 +66,9 @@ export const Route = createFileRoute("/admin")({
    HELPERS PRIX
 ========================================================= */
 
-const cleanPrice = (value?: string | number | null): string => {
+const cleanPrice = (
+  value?: string | number | null
+): string => {
   const raw = String(value ?? "")
     .replace(/DT/gi, "")
     .replace(/\s/g, "")
@@ -80,6 +95,38 @@ const priceInputValue = (
     .replace(/DT/gi, "")
     .trim();
 };
+
+/* =========================================================
+   TYPES FORM PACK
+========================================================= */
+
+type PackProductForm = {
+  productId: string | null;
+  name: string;
+  price: string;
+  duration: string;
+  description: string;
+};
+
+type PackForm = {
+  name: string;
+  price: string;
+  duration: string;
+  description: string;
+  image: string;
+  active: boolean;
+  products: PackProductForm[];
+};
+
+const createEmptyPackForm = (): PackForm => ({
+  name: "",
+  price: "",
+  duration: "30 jours",
+  description: "",
+  image: "",
+  active: true,
+  products: [],
+});
 
 function AdminPage() {
   const navigate = useNavigate();
@@ -172,6 +219,42 @@ function AdminPage() {
     editSocialProduct,
     setEditSocialProduct,
   ] = useState<SocialProduct | null>(null);
+
+  /* =========================================================
+     PACKS
+  ========================================================= */
+
+  const [
+    packs,
+    setPacks,
+  ] = useState<Record<string, Pack>>({});
+
+  const [
+    packsLoading,
+    setPacksLoading,
+  ] = useState(true);
+
+  const [
+    packsError,
+    setPacksError,
+  ] = useState("");
+
+  const [
+    packModalOpen,
+    setPackModalOpen,
+  ] = useState(false);
+
+  const [
+    editingPackId,
+    setEditingPackId,
+  ] = useState<string | null>(null);
+
+  const [
+    packForm,
+    setPackForm,
+  ] = useState<PackForm>(
+    createEmptyPackForm()
+  );
 
   /* =========================================================
      CLIENTS
@@ -320,6 +403,50 @@ function AdminPage() {
       };
 
     void loadSocialProducts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  /* =========================================================
+     CHARGEMENT PACKS
+  ========================================================= */
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadPacks = async () => {
+      try {
+        setPacksLoading(true);
+        setPacksError("");
+
+        const data = await getPacks();
+
+        if (mounted) {
+          setPacks(data);
+        }
+      } catch (error) {
+        console.error(
+          "Erreur chargement packs:",
+          error
+        );
+
+        if (mounted) {
+          setPacksError(
+            error instanceof Error
+              ? error.message
+              : "Impossible de charger les packs."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setPacksLoading(false);
+        }
+      }
+    };
+
+    void loadPacks();
 
     return () => {
       mounted = false;
@@ -604,11 +731,6 @@ function AdminPage() {
               ]
             : [],
       };
-
-      console.log(
-        "Produit envoyé à Supabase:",
-        updatedProduct
-      );
 
       await updateProduct(
         editingSlug,
@@ -1077,6 +1199,513 @@ function AdminPage() {
     };
 
   /* =========================================================
+     PACKS
+  ========================================================= */
+
+  const openNewPack = () => {
+    setEditingPackId(null);
+    setPackForm(
+      createEmptyPackForm()
+    );
+    setPackModalOpen(true);
+  };
+
+  const openEditPack = (
+    id: string
+  ) => {
+    const pack =
+      packs[id];
+
+    if (!pack) {
+      return;
+    }
+
+    setEditingPackId(id);
+
+    setPackForm({
+      name:
+        pack.name ?? "",
+
+      price:
+        priceInputValue(
+          pack.price
+        ),
+
+      duration:
+        pack.duration ?? "30 jours",
+
+      description:
+        pack.description ?? "",
+
+      image:
+        pack.image ?? "",
+
+      active:
+        pack.active !== false,
+
+      products:
+        (pack.products ?? []).map(
+          (product) => ({
+            productId:
+              product.productId ??
+              null,
+
+            name:
+              product.name ?? "",
+
+            price:
+              priceInputValue(
+                product.price
+              ),
+
+            duration:
+              product.duration ?? "",
+
+            description:
+              product.description ?? "",
+          })
+        ),
+    });
+
+    setPackModalOpen(true);
+  };
+
+  const closePackModal = () => {
+    setPackModalOpen(false);
+    setEditingPackId(null);
+    setPackForm(
+      createEmptyPackForm()
+    );
+  };
+
+  const toggleExistingProductInPack = (
+    productId: string
+  ) => {
+    const existingIndex =
+      packForm.products.findIndex(
+        (product) =>
+          product.productId ===
+          productId
+      );
+
+    if (existingIndex >= 0) {
+      setPackForm(
+        (previous) => ({
+          ...previous,
+
+          products:
+            previous.products.filter(
+              (_, index) =>
+                index !== existingIndex
+            ),
+        })
+      );
+
+      return;
+    }
+
+    const product =
+      products[productId];
+
+    if (!product) {
+      return;
+    }
+
+    const productPrice =
+      product.pricesByDuration?.[
+        "1 month"
+      ] ?? "0 DT";
+
+    setPackForm(
+      (previous) => ({
+        ...previous,
+
+        products: [
+          ...previous.products,
+
+          {
+            productId,
+
+            name:
+              product.name,
+
+            price:
+              priceInputValue(
+                productPrice
+              ),
+
+            duration:
+              product.duration ??
+              "1 mois",
+
+            description:
+              product.description ??
+              "",
+          },
+        ],
+      })
+    );
+  };
+
+  const addExclusiveProduct = () => {
+    setPackForm(
+      (previous) => ({
+        ...previous,
+
+        products: [
+          ...previous.products,
+
+          {
+            productId:
+              null,
+
+            name:
+              "",
+
+            price:
+              "",
+
+            duration:
+              "30 jours",
+
+            description:
+              "",
+          },
+        ],
+      })
+    );
+  };
+
+  const removePackProduct = (
+    index: number
+  ) => {
+    setPackForm(
+      (previous) => ({
+        ...previous,
+
+        products:
+          previous.products.filter(
+            (_, itemIndex) =>
+              itemIndex !== index
+          ),
+      })
+    );
+  };
+
+  const updatePackProductField = (
+    index: number,
+    field: keyof PackProductForm,
+    value: string
+  ) => {
+    setPackForm(
+      (previous) => ({
+        ...previous,
+
+        products:
+          previous.products.map(
+            (product, itemIndex) =>
+              itemIndex === index
+                ? {
+                    ...product,
+
+                    [field]:
+                      value,
+                  }
+                : product
+          ),
+      })
+    );
+  };
+
+  const savePack = async () => {
+    const name =
+      packForm.name.trim();
+
+    if (!name) {
+      window.alert(
+        "Le nom du Pack est obligatoire."
+      );
+      return;
+    }
+
+    const priceNumber =
+      Number(
+        packForm.price
+          .replace(",", ".")
+          .trim()
+      );
+
+    if (
+      !Number.isFinite(
+        priceNumber
+      ) ||
+      priceNumber < 0
+    ) {
+      window.alert(
+        "Entre un prix valide pour le Pack."
+      );
+      return;
+    }
+
+    if (
+      !packForm.duration.trim()
+    ) {
+      window.alert(
+        "La durée du Pack est obligatoire."
+      );
+      return;
+    }
+
+    if (
+      packForm.products.length === 0
+    ) {
+      window.alert(
+        "Ajoute au moins un produit au Pack."
+      );
+      return;
+    }
+
+    const invalidExclusive =
+      packForm.products.some(
+        (product) =>
+          product.productId === null &&
+          !product.name.trim()
+      );
+
+    if (invalidExclusive) {
+      window.alert(
+        "Tous les produits exclusifs doivent avoir un nom."
+      );
+      return;
+    }
+
+    try {
+      const packProducts: PackProduct[] =
+        packForm.products.map(
+          (product, index) => ({
+            productId:
+              product.productId,
+
+            name:
+              product.name.trim(),
+
+            price:
+              cleanPrice(
+                product.price
+              ),
+
+            duration:
+              product.duration.trim(),
+
+            description:
+              product.description.trim(),
+
+            position:
+              index,
+          })
+        );
+
+      const packData: Pack = {
+        name,
+
+        price:
+          cleanPrice(
+            packForm.price
+          ),
+
+        duration:
+          packForm.duration.trim(),
+
+        description:
+          packForm.description.trim(),
+
+        image:
+          packForm.image.trim(),
+
+        active:
+          packForm.active,
+
+        position:
+          editingPackId
+            ? packs[
+                editingPackId
+              ]?.position ?? 0
+            : Object.keys(
+                packs
+              ).length,
+
+        products:
+          packProducts,
+      };
+
+      if (editingPackId) {
+        await updatePack(
+          editingPackId,
+          packData
+        );
+
+        setPacks(
+          (previous) => ({
+            ...previous,
+
+            [editingPackId]: {
+              ...packData,
+
+              id:
+                editingPackId,
+            },
+          })
+        );
+
+        window.alert(
+          "Pack modifié avec succès ✅"
+        );
+      } else {
+        const id =
+          await createPack(
+            packData,
+            packData.position
+          );
+
+        setPacks(
+          (previous) => ({
+            ...previous,
+
+            [id]: {
+              ...packData,
+
+              id,
+            },
+          })
+        );
+
+        window.alert(
+          "Pack créé avec succès ✅"
+        );
+      }
+
+      closePackModal();
+    } catch (error) {
+      console.error(
+        "Erreur sauvegarde Pack:",
+        error
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+      window.alert(
+        `Impossible d'enregistrer le Pack.\n\n${message}`
+      );
+    }
+  };
+
+  const togglePackVisible =
+    async (
+      id: string
+    ) => {
+      const pack =
+        packs[id];
+
+      if (!pack) {
+        return;
+      }
+
+      const nextActive =
+        !pack.active;
+
+      try {
+        await setPackActive(
+          id,
+          nextActive
+        );
+
+        setPacks(
+          (previous) => ({
+            ...previous,
+
+            [id]: {
+              ...previous[id],
+
+              active:
+                nextActive,
+            },
+          })
+        );
+      } catch (error) {
+        console.error(
+          "Erreur visibilité Pack:",
+          error
+        );
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : String(error);
+
+        window.alert(
+          `Impossible de modifier la visibilité du Pack.\n\n${message}`
+        );
+      }
+    };
+
+  const removePack = async (
+    id: string
+  ) => {
+    const pack =
+      packs[id];
+
+    if (!pack) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Supprimer le Pack "${pack.name}" ?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deletePack(id);
+
+      setPacks(
+        (previous) => {
+          const updated = {
+            ...previous,
+          };
+
+          delete updated[id];
+
+          return updated;
+        }
+      );
+
+      window.alert(
+        "Pack supprimé avec succès."
+      );
+    } catch (error) {
+      console.error(
+        "Erreur suppression Pack:",
+        error
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+      window.alert(
+        `Impossible de supprimer le Pack.\n\n${message}`
+      );
+    }
+  };
+
+  /* =========================================================
      PAIEMENTS
   ========================================================= */
 
@@ -1462,11 +2091,13 @@ function AdminPage() {
 
   return (
     <main className="min-h-screen bg-background px-4 py-10 text-foreground sm:px-6">
+
       <div className="mx-auto max-w-7xl">
 
         {/* HEADER */}
 
         <div className="mb-8">
+
           <h1 className="text-4xl font-bold">
             Dashboard Admin
           </h1>
@@ -1476,6 +2107,7 @@ function AdminPage() {
             clients, paiements
             et produits sociaux.
           </p>
+
         </div>
 
         {/* NAVIGATION */}
@@ -1558,6 +2190,256 @@ function AdminPage() {
         </div>
 
         {/* =====================================================
+            PACKS
+        ===================================================== */}
+
+        <section className="mb-8 rounded-2xl border bg-card p-6">
+
+          <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+
+            <div>
+
+              <div className="flex items-center gap-2">
+
+                <Package className="h-6 w-6 text-primary" />
+
+                <h2 className="text-2xl font-bold">
+                  Gestion des Packs
+                </h2>
+
+              </div>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                Créez des packs avec plusieurs produits existants ou exclusifs.
+              </p>
+
+            </div>
+
+            <button
+              type="button"
+              onClick={openNewPack}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-2 text-primary-foreground transition hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" />
+              Ajouter un pack
+            </button>
+
+          </div>
+
+          {packsLoading && (
+
+            <div className="rounded-2xl border p-6 text-center text-muted-foreground">
+              Chargement des Packs...
+            </div>
+
+          )}
+
+          {packsError && (
+
+            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-6 text-center text-destructive">
+              {packsError}
+            </div>
+
+          )}
+
+          {!packsLoading &&
+            !packsError && (
+
+              <div className="overflow-x-auto rounded-2xl border">
+
+                <table className="min-w-[900px] w-full text-left text-sm">
+
+                  <thead className="bg-muted">
+
+                    <tr>
+
+                      <th className="p-4">
+                        Nom
+                      </th>
+
+                      <th className="p-4">
+                        Prix
+                      </th>
+
+                      <th className="p-4">
+                        Durée
+                      </th>
+
+                      <th className="p-4">
+                        Produits
+                      </th>
+
+                      <th className="p-4">
+                        État
+                      </th>
+
+                      <th className="p-4">
+                        Actions
+                      </th>
+
+                    </tr>
+
+                  </thead>
+
+                  <tbody>
+
+                    {Object.keys(
+                      packs
+                    ).length === 0 ? (
+
+                      <tr>
+
+                        <td
+                          colSpan={6}
+                          className="p-8 text-center text-muted-foreground"
+                        >
+                          Aucun Pack créé pour le moment.
+                        </td>
+
+                      </tr>
+
+                    ) : (
+
+                      Object.entries(
+                        packs
+                      ).map(
+                        ([id, pack]) => (
+
+                          <tr
+                            key={id}
+                            className="border-t"
+                          >
+
+                            <td className="p-4">
+
+                              <div className="flex items-center gap-3">
+
+                                {pack.image ? (
+
+                                  <img
+                                    src={pack.image}
+                                    alt={pack.name}
+                                    className="h-12 w-12 rounded-lg object-cover"
+                                  />
+
+                                ) : (
+
+                                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                                    <Package className="h-5 w-5 text-primary" />
+                                  </div>
+
+                                )}
+
+                                <div>
+
+                                  <div className="font-bold">
+                                    {pack.name}
+                                  </div>
+
+                                  {pack.description && (
+
+                                    <div className="max-w-xs truncate text-xs text-muted-foreground">
+                                      {pack.description}
+                                    </div>
+
+                                  )}
+
+                                </div>
+
+                              </div>
+
+                            </td>
+
+                            <td className="p-4 font-bold text-primary">
+                              {cleanPrice(
+                                pack.price
+                              )}
+                            </td>
+
+                            <td className="p-4">
+                              {pack.duration}
+                            </td>
+
+                            <td className="p-4">
+
+                              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold">
+                                {pack.products?.length ?? 0} produit(s)
+                              </span>
+
+                            </td>
+
+                            <td className="p-4">
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  togglePackVisible(
+                                    id
+                                  )
+                                }
+                                className={
+                                  pack.active
+                                    ? "rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white"
+                                    : "rounded-full bg-gray-500 px-3 py-1 text-xs font-bold text-white"
+                                }
+                              >
+                                {pack.active
+                                  ? "Visible"
+                                  : "Invisible"}
+                              </button>
+
+                            </td>
+
+                            <td className="p-4">
+
+                              <div className="flex gap-2">
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openEditPack(
+                                      id
+                                    )
+                                  }
+                                  className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground"
+                                >
+                                  Modifier
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removePack(
+                                      id
+                                    )
+                                  }
+                                  className="rounded-md bg-destructive px-3 py-2 text-xs text-destructive-foreground"
+                                >
+                                  Supprimer
+                                </button>
+
+                              </div>
+
+                            </td>
+
+                          </tr>
+
+                        )
+                      )
+
+                    )}
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+            )}
+
+        </section>
+
+        {/* =====================================================
             PRODUITS SOCIAUX
         ===================================================== */}
 
@@ -1578,6 +2460,7 @@ function AdminPage() {
                 )
               }
             >
+
               <option value="followers">
                 Followers
               </option>
@@ -1589,6 +2472,7 @@ function AdminPage() {
               <option value="views">
                 Views
               </option>
+
             </select>
 
             <input
@@ -2014,6 +2898,7 @@ function AdminPage() {
                           </td>
 
                         </tr>
+
                       )
                     )}
 
@@ -2537,6 +3422,589 @@ function AdminPage() {
       </div>
 
       {/* =====================================================
+          MODAL PACK
+      ===================================================== */}
+
+      {packModalOpen && (
+
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-2xl bg-background p-6 shadow-xl">
+
+            <div className="mb-6">
+
+              <h2 className="text-2xl font-bold">
+                {editingPackId
+                  ? "Modifier le Pack"
+                  : "Ajouter un Pack"}
+              </h2>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                Créez un ensemble de produits avec un prix unique.
+              </p>
+
+            </div>
+
+            <div className="grid gap-5">
+
+              {/* NOM */}
+
+              <div>
+
+                <label className="mb-1 block text-sm font-medium">
+                  Nom du Pack
+                </label>
+
+                <input
+                  className="w-full rounded-md border bg-background px-4 py-2"
+                  placeholder="Ex. Pack Gaming"
+                  value={packForm.name}
+                  onChange={(event) =>
+                    setPackForm(
+                      (previous) => ({
+                        ...previous,
+                        name:
+                          event.target.value,
+                      })
+                    )
+                  }
+                />
+
+              </div>
+
+              {/* PRIX + DURÉE */}
+
+              <div className="grid gap-4 md:grid-cols-2">
+
+                <div>
+
+                  <label className="mb-1 block text-sm font-medium">
+                    Prix du Pack
+                  </label>
+
+                  <div className="flex items-center gap-2">
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded-md border bg-background px-4 py-2"
+                      placeholder="39"
+                      value={packForm.price}
+                      onChange={(event) =>
+                        setPackForm(
+                          (previous) => ({
+                            ...previous,
+                            price:
+                              event.target.value,
+                          })
+                        )
+                      }
+                    />
+
+                    <span className="font-bold">
+                      DT
+                    </span>
+
+                  </div>
+
+                </div>
+
+                <div>
+
+                  <label className="mb-1 block text-sm font-medium">
+                    Durée
+                  </label>
+
+                  <input
+                    className="w-full rounded-md border bg-background px-4 py-2"
+                    placeholder="30 jours"
+                    value={packForm.duration}
+                    onChange={(event) =>
+                      setPackForm(
+                        (previous) => ({
+                          ...previous,
+                          duration:
+                            event.target.value,
+                        })
+                      )
+                    }
+                  />
+
+                </div>
+
+              </div>
+
+              {/* DESCRIPTION */}
+
+              <div>
+
+                <label className="mb-1 block text-sm font-medium">
+                  Description
+                </label>
+
+                <textarea
+                  className="min-h-24 w-full rounded-md border bg-background px-4 py-2"
+                  placeholder="Description du Pack"
+                  value={packForm.description}
+                  onChange={(event) =>
+                    setPackForm(
+                      (previous) => ({
+                        ...previous,
+                        description:
+                          event.target.value,
+                      })
+                    )
+                  }
+                />
+
+              </div>
+
+              {/* IMAGE */}
+
+              <div>
+
+                <label className="mb-1 block text-sm font-medium">
+                  Image du Pack
+                </label>
+
+                <input
+                  className="w-full rounded-md border bg-background px-4 py-2"
+                  placeholder="https://..."
+                  value={packForm.image}
+                  onChange={(event) =>
+                    setPackForm(
+                      (previous) => ({
+                        ...previous,
+                        image:
+                          event.target.value,
+                      })
+                    )
+                  }
+                />
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  URL de l'image. Tu peux laisser vide.
+                </p>
+
+              </div>
+
+              {/* PRODUITS EXISTANTS */}
+
+              <div className="rounded-2xl border p-5">
+
+                <div className="mb-4">
+
+                  <h3 className="text-lg font-bold">
+                    Produits existants
+                  </h3>
+
+                  <p className="text-sm text-muted-foreground">
+                    Sélectionne les produits déjà présents dans ton catalogue.
+                  </p>
+
+                </div>
+
+                {productsLoading ? (
+
+                  <div className="rounded-md border p-4 text-center text-sm text-muted-foreground">
+                    Chargement des produits...
+                  </div>
+
+                ) : Object.keys(
+                    products
+                  ).length === 0 ? (
+
+                  <div className="rounded-md border p-4 text-center text-sm text-muted-foreground">
+                    Aucun produit disponible.
+                  </div>
+
+                ) : (
+
+                  <div className="grid gap-3 md:grid-cols-2">
+
+                    {Object.entries(
+                      products
+                    ).map(
+                      ([id, product]) => {
+
+                        const checked =
+                          packForm.products.some(
+                            (item) =>
+                              item.productId ===
+                              id
+                          );
+
+                        return (
+
+                          <label
+                            key={id}
+                            className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition ${
+                              checked
+                                ? "border-primary bg-primary/10"
+                                : "hover:bg-muted"
+                            }`}
+                          >
+
+                            <input
+                              type="checkbox"
+                              checked={
+                                checked
+                              }
+                              onChange={() =>
+                                toggleExistingProductInPack(
+                                  id
+                                )
+                              }
+                            />
+
+                            <div className="min-w-0 flex-1">
+
+                              <div className="font-semibold">
+                                {product.name}
+                              </div>
+
+                              <div className="text-xs text-muted-foreground">
+                                {product.pricesByDuration?.[
+                                  "1 month"
+                                ] ??
+                                  "0 DT"}{" "}
+                                •{" "}
+                                {product.duration}
+                              </div>
+
+                            </div>
+
+                          </label>
+
+                        );
+                      }
+                    )}
+
+                  </div>
+
+                )}
+
+              </div>
+
+              {/* PRODUITS SÉLECTIONNÉS */}
+
+              {packForm.products.filter(
+                (product) =>
+                  product.productId !== null
+              ).length > 0 && (
+
+                <div className="rounded-2xl border p-5">
+
+                  <h3 className="mb-4 text-lg font-bold">
+                    Produits sélectionnés
+                  </h3>
+
+                  <div className="space-y-2">
+
+                    {packForm.products
+                      .map(
+                        (
+                          product,
+                          index
+                        ) =>
+                          product.productId !==
+                          null ? (
+
+                            <div
+                              key={`${product.productId}-${index}`}
+                              className="flex items-center justify-between rounded-xl bg-muted/40 p-3"
+                            >
+
+                              <div>
+
+                                <div className="font-medium">
+                                  {product.name}
+                                </div>
+
+                                <div className="text-xs text-muted-foreground">
+                                  {cleanPrice(
+                                    product.price
+                                  )}{" "}
+                                  •{" "}
+                                  {product.duration}
+                                </div>
+
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removePackProduct(
+                                    index
+                                  )
+                                }
+                                className="rounded-md p-2 text-destructive transition hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+
+                            </div>
+
+                          ) : null
+                      )}
+
+                  </div>
+
+                </div>
+
+              )}
+
+              {/* PRODUITS EXCLUSIFS */}
+
+              <div className="rounded-2xl border p-5">
+
+                <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+
+                  <div>
+
+                    <h3 className="text-lg font-bold">
+                      Produits exclusifs au Pack
+                    </h3>
+
+                    <p className="text-sm text-muted-foreground">
+                      Ces produits peuvent exister uniquement dans ce Pack.
+                    </p>
+
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={
+                      addExclusiveProduct
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-md border border-primary px-4 py-2 text-primary transition hover:bg-primary hover:text-primary-foreground"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Ajouter un produit
+                  </button>
+
+                </div>
+
+                {packForm.products.filter(
+                  (product) =>
+                    product.productId === null
+                ).length === 0 ? (
+
+                  <div className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">
+                    Aucun produit exclusif.
+                  </div>
+
+                ) : (
+
+                  <div className="space-y-5">
+
+                    {packForm.products.map(
+                      (
+                        product,
+                        index
+                      ) => {
+
+                        if (
+                          product.productId !==
+                          null
+                        ) {
+                          return null;
+                        }
+
+                        return (
+
+                          <div
+                            key={`exclusive-${index}`}
+                            className="rounded-xl border bg-muted/20 p-4"
+                          >
+
+                            <div className="mb-4 flex items-center justify-between">
+
+                              <h4 className="font-semibold">
+                                Produit exclusif
+                              </h4>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removePackProduct(
+                                    index
+                                  )
+                                }
+                                className="rounded-md p-2 text-destructive transition hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+
+                            </div>
+
+                            <div className="grid gap-3 md:grid-cols-2">
+
+                              <input
+                                className="rounded-md border bg-background px-4 py-2"
+                                placeholder="Nom du produit"
+                                value={
+                                  product.name
+                                }
+                                onChange={(
+                                  event
+                                ) =>
+                                  updatePackProductField(
+                                    index,
+                                    "name",
+                                    event.target.value
+                                  )
+                                }
+                              />
+
+                              <div className="flex items-center gap-2">
+
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className="w-full rounded-md border bg-background px-4 py-2"
+                                  placeholder="Prix"
+                                  value={
+                                    product.price
+                                  }
+                                  onChange={(
+                                    event
+                                  ) =>
+                                    updatePackProductField(
+                                      index,
+                                      "price",
+                                      event.target.value
+                                    )
+                                  }
+                                />
+
+                                <span className="font-bold">
+                                  DT
+                                </span>
+
+                              </div>
+
+                              <input
+                                className="rounded-md border bg-background px-4 py-2"
+                                placeholder="Durée"
+                                value={
+                                  product.duration
+                                }
+                                onChange={(
+                                  event
+                                ) =>
+                                  updatePackProductField(
+                                    index,
+                                    "duration",
+                                    event.target.value
+                                  )
+                                }
+                              />
+
+                              <input
+                                className="rounded-md border bg-background px-4 py-2"
+                                placeholder="Description"
+                                value={
+                                  product.description
+                                }
+                                onChange={(
+                                  event
+                                ) =>
+                                  updatePackProductField(
+                                    index,
+                                    "description",
+                                    event.target.value
+                                  )
+                                }
+                              />
+
+                            </div>
+
+                          </div>
+
+                        );
+                      }
+                    )}
+
+                  </div>
+
+                )}
+
+              </div>
+
+              {/* VISIBILITÉ */}
+
+              <label className="flex cursor-pointer items-center gap-3 rounded-md border p-4">
+
+                <input
+                  type="checkbox"
+                  checked={
+                    packForm.active
+                  }
+                  onChange={(event) =>
+                    setPackForm(
+                      (previous) => ({
+                        ...previous,
+                        active:
+                          event.target.checked,
+                      })
+                    )
+                  }
+                />
+
+                <div>
+
+                  <div className="font-medium">
+                    Pack visible
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    Le Pack sera affiché sur la page publique lorsqu'il est visible.
+                  </div>
+
+                </div>
+
+              </label>
+
+            </div>
+
+            {/* BOUTONS */}
+
+            <div className="mt-6 flex flex-col-reverse justify-end gap-3 sm:flex-row">
+
+              <button
+                type="button"
+                onClick={
+                  closePackModal
+                }
+                className="rounded-md border px-5 py-2 transition hover:bg-muted"
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  savePack
+                }
+                className="rounded-md bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:opacity-90"
+              >
+                {editingPackId
+                  ? "Enregistrer les modifications"
+                  : "Créer le Pack"}
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+      {/* =====================================================
           MODAL MODIFICATION PRODUIT SOCIAL
       ===================================================== */}
 
@@ -2557,9 +4025,8 @@ function AdminPage() {
 
               <div className="grid gap-4">
 
-                {/* NOM */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Nom du produit
                   </label>
@@ -2577,13 +4044,12 @@ function AdminPage() {
                           event.target.value,
                       })
                     }
-                    placeholder="Nom du produit"
                   />
+
                 </div>
 
-                {/* TYPE */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Type
                   </label>
@@ -2617,11 +4083,11 @@ function AdminPage() {
                     </option>
 
                   </select>
+
                 </div>
 
-                {/* QUANTITÉ */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Quantité
                   </label>
@@ -2643,13 +4109,12 @@ function AdminPage() {
                           ),
                       })
                     }
-                    placeholder="1000"
                   />
+
                 </div>
 
-                {/* PRIX */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Prix
                   </label>
@@ -2674,7 +4139,6 @@ function AdminPage() {
                             ),
                         })
                       }
-                      placeholder="10"
                     />
 
                     <span className="font-bold">
@@ -2682,11 +4146,11 @@ function AdminPage() {
                     </span>
 
                   </div>
+
                 </div>
 
-                {/* ANCIEN PRIX */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Ancien prix
                   </label>
@@ -2711,7 +4175,6 @@ function AdminPage() {
                             ),
                         })
                       }
-                      placeholder="20"
                     />
 
                     <span className="font-bold">
@@ -2719,11 +4182,11 @@ function AdminPage() {
                     </span>
 
                   </div>
+
                 </div>
 
-                {/* DESCRIPTION */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Description
                   </label>
@@ -2741,11 +4204,9 @@ function AdminPage() {
                           event.target.value,
                       })
                     }
-                    placeholder="Description du produit social"
                   />
-                </div>
 
-                {/* VISIBILITÉ */}
+                </div>
 
                 <label className="flex cursor-pointer items-center gap-2 rounded-md border p-3">
 
@@ -2771,8 +4232,6 @@ function AdminPage() {
                 </label>
 
               </div>
-
-              {/* BOUTONS */}
 
               <div className="mt-6 flex justify-end gap-3">
 
@@ -2825,9 +4284,8 @@ function AdminPage() {
 
               <div className="grid gap-4">
 
-                {/* NOM */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Nom du produit
                   </label>
@@ -2846,13 +4304,12 @@ function AdminPage() {
                             .value,
                       })
                     }
-                    placeholder="Nom"
                   />
+
                 </div>
 
-                {/* ANCIEN PRIX */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Ancien prix
                   </label>
@@ -2876,7 +4333,6 @@ function AdminPage() {
                               .value,
                         })
                       }
-                      placeholder="100"
                     />
 
                     <span className="font-bold">
@@ -2884,231 +4340,83 @@ function AdminPage() {
                     </span>
 
                   </div>
+
                 </div>
 
-                {/* PRIX 1 MOIS */}
+                {[
+                  [
+                    "1 month",
+                    "Prix 1 mois",
+                  ],
+                  [
+                    "2 months",
+                    "Prix 2 mois",
+                  ],
+                  [
+                    "3 months",
+                    "Prix 3 mois",
+                  ],
+                  [
+                    "6 months",
+                    "Prix 6 mois",
+                  ],
+                  [
+                    "1 year",
+                    "Prix 1 an",
+                  ],
+                ].map(
+                  ([duration, label]) => (
+
+                    <div
+                      key={duration}
+                    >
+
+                      <label className="mb-1 block text-sm font-medium">
+                        {label}
+                      </label>
+
+                      <div className="flex items-center gap-2">
+
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="w-full rounded-md border bg-background px-4 py-2"
+                          value={priceInputValue(
+                            editProduct
+                              .pricesByDuration?.[
+                              duration as keyof typeof editProduct.pricesByDuration
+                            ]
+                          )}
+                          onChange={(event) =>
+                            setEditProduct({
+                              ...editProduct,
+
+                              pricesByDuration:
+                                {
+                                  ...editProduct.pricesByDuration,
+
+                                  [duration]:
+                                    event.target
+                                      .value,
+                                },
+                            })
+                          }
+                        />
+
+                        <span className="font-bold">
+                          DT
+                        </span>
+
+                      </div>
+
+                    </div>
+
+                  )
+                )}
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 1 mois
-                  </label>
 
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "1 month"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "1 month":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="30"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* PRIX 2 MOIS */}
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 2 mois
-                  </label>
-
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "2 months"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "2 months":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="55"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* PRIX 3 MOIS */}
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 3 mois
-                  </label>
-
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "3 months"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "3 months":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="75"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* PRIX 6 MOIS */}
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 6 mois
-                  </label>
-
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "6 months"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "6 months":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="100"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* PRIX 1 AN */}
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Prix 1 an
-                  </label>
-
-                  <div className="flex items-center gap-2">
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-md border bg-background px-4 py-2"
-                      value={priceInputValue(
-                        editProduct
-                          .pricesByDuration?.[
-                          "1 year"
-                        ]
-                      )}
-                      onChange={(event) =>
-                        setEditProduct({
-                          ...editProduct,
-
-                          pricesByDuration:
-                            {
-                              ...editProduct.pricesByDuration,
-
-                              "1 year":
-                                event.target
-                                  .value,
-                            },
-                        })
-                      }
-                      placeholder="180"
-                    />
-
-                    <span className="font-bold">
-                      DT
-                    </span>
-
-                  </div>
-                </div>
-
-                {/* CATÉGORIE */}
-
-                <div>
                   <label className="mb-1 block text-sm font-medium">
                     Catégorie
                   </label>
@@ -3127,13 +4435,12 @@ function AdminPage() {
                             .value,
                       })
                     }
-                    placeholder="AI Tools"
                   />
+
                 </div>
 
-                {/* DESCRIPTION */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Description
                   </label>
@@ -3152,13 +4459,12 @@ function AdminPage() {
                             .value,
                       })
                     }
-                    placeholder="Description du produit"
                   />
+
                 </div>
 
-                {/* FEATURES */}
-
                 <div>
+
                   <label className="mb-1 block text-sm font-medium">
                     Fonctionnalités
                   </label>
@@ -3183,11 +4489,9 @@ function AdminPage() {
                             ),
                       })
                     }
-                    placeholder="Une fonctionnalité par ligne"
                   />
-                </div>
 
-                {/* VISIBILITÉ */}
+                </div>
 
                 <label className="flex cursor-pointer items-center gap-2 rounded-md border p-3">
 
@@ -3214,8 +4518,6 @@ function AdminPage() {
                 </label>
 
               </div>
-
-              {/* BOUTONS */}
 
               <div className="mt-6 flex justify-end gap-3">
 
