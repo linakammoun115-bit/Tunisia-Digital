@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 
+import { supabase } from "@/lib/supabase";
+
 import {
   Gift,
   ShoppingBag,
@@ -255,6 +257,11 @@ function AdminPage() {
   ] = useState<PackForm>(
     createEmptyPackForm()
   );
+
+  const [
+    packImageUploading,
+    setPackImageUploading,
+  ] = useState(false);
 
   /* =========================================================
      CLIENTS
@@ -1276,6 +1283,95 @@ function AdminPage() {
     setPackForm(
       createEmptyPackForm()
     );
+    setPackImageUploading(false);
+  };
+
+  const handlePackImageChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      window.alert("Veuillez sélectionner une image valide.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      window.alert("L'image ne doit pas dépasser 5 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setPackImageUploading(true);
+
+      const extension =
+        file.name.split(".").pop()?.toLowerCase() || "jpg";
+
+      const uniqueId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const filePath = `packs/${uniqueId}.${extension}`;
+
+      const { error: uploadError } =
+        await supabase.storage
+          .from("pack-images")
+          .upload(filePath, file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data } =
+        supabase.storage
+          .from("pack-images")
+          .getPublicUrl(filePath);
+
+      if (!data?.publicUrl) {
+        throw new Error(
+          "Impossible de récupérer l'URL publique de l'image."
+        );
+      }
+
+      setPackForm((previous) => ({
+        ...previous,
+        image: data.publicUrl,
+      }));
+    } catch (error) {
+      console.error(
+        "Erreur upload image Pack:",
+        error
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+      window.alert(
+        `Impossible d'envoyer l'image.\n\n${message}`
+      );
+    } finally {
+      setPackImageUploading(false);
+      event.target.value = "";
+    }
+  };
+
+  const removePackImage = () => {
+    setPackForm((previous) => ({
+      ...previous,
+      image: "",
+    }));
   };
 
   const toggleExistingProductInPack = (
@@ -3560,7 +3656,7 @@ function AdminPage() {
 
               </div>
 
-              {/* IMAGE */}
+              {/* IMAGE DU PACK */}
 
               <div>
 
@@ -3568,23 +3664,78 @@ function AdminPage() {
                   Image du Pack
                 </label>
 
-                <input
-                  className="w-full rounded-md border bg-background px-4 py-2"
-                  placeholder="https://..."
-                  value={packForm.image}
-                  onChange={(event) =>
-                    setPackForm(
-                      (previous) => ({
-                        ...previous,
-                        image:
-                          event.target.value,
-                      })
-                    )
-                  }
-                />
+                <div className="rounded-xl border border-dashed p-4">
 
-                <p className="mt-1 text-xs text-muted-foreground">
-                  URL de l'image. Tu peux laisser vide.
+                  {packForm.image ? (
+                    <div className="space-y-4">
+
+                      <div className="overflow-hidden rounded-xl border bg-muted">
+                        <img
+                          src={packForm.image}
+                          alt={packForm.name || "Image du Pack"}
+                          className="h-48 w-full object-cover"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+
+                        <label className="inline-flex cursor-pointer items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90">
+                          {packImageUploading
+                            ? "Upload en cours..."
+                            : "Changer l'image"}
+
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={packImageUploading}
+                            onChange={handlePackImageChange}
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={removePackImage}
+                          disabled={packImageUploading}
+                          className="inline-flex items-center gap-2 rounded-md border border-destructive px-4 py-2 text-sm font-medium text-destructive transition hover:bg-destructive hover:text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Supprimer l'image
+                        </button>
+
+                      </div>
+
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl px-6 py-10 text-center transition hover:bg-muted/50">
+
+                      <Package className="mb-3 h-10 w-10 text-muted-foreground" />
+
+                      <span className="font-medium">
+                        {packImageUploading
+                          ? "Upload de l'image..."
+                          : "Choisir une image"}
+                      </span>
+
+                      <span className="mt-1 text-xs text-muted-foreground">
+                        PNG, JPG, WEBP — maximum 5 MB
+                      </span>
+
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={packImageUploading}
+                        onChange={handlePackImageChange}
+                      />
+
+                    </label>
+                  )}
+
+                </div>
+
+                <p className="mt-2 text-xs text-muted-foreground">
+                  L'image sera envoyée automatiquement dans Supabase Storage.
                 </p>
 
               </div>
