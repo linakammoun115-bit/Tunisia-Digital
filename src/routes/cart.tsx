@@ -1273,13 +1273,13 @@ function CartPage() {
 
               <Button
   onClick={(e) => {
-    (window as any).fbq('track', 'Purchase');
+    (window as any).fbq?.('track', 'Purchase');
     checkout(e);
   }}
   disabled={!customer.name.trim() || !customer.phone.trim()}
-  className="h-12 w-full border-0 gradient-primary text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
-
-  Confirmez & Commandez via WhatsApp
+  className="h-12 w-full border-0 gradient-primary text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  Confirmez &amp; Commandez via WhatsApp
 </Button>
 
             </aside>
