@@ -4,14 +4,8 @@ export type WheelReward = {
   percentage: number;
   productName?: string;
   used: boolean;
-
-  // Date de création de la récompense.
   createdAt: string;
-
-  // La promotion expire une heure après sa création.
   expiresAt: number;
-
-  // Date d'utilisation de la récompense.
   usedAt?: string;
 };
 
@@ -22,39 +16,35 @@ export type CreateWheelRewardInput = {
   productName?: string;
 };
 
-const WHEEL_REWARD_KEY =
-  "wheel-reward";
+const WHEEL_REWARD_KEY = "wheel-reward";
+const WHEEL_SPIN_DAY_KEY = "wheel-spin-day";
 
-const WHEEL_SPIN_MONTH_KEY =
-  "wheel-spin-month";
-
-const REWARD_DURATION_MS =
-  60 * 60 * 1000;
+const REWARD_DURATION_MS = 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function isBrowser() {
-  return typeof window !==
-    "undefined";
+  return typeof window !== "undefined";
 }
 
-export function getCurrentMonthKey() {
+/**
+ * Retourne la date actuelle au format YYYY-MM-DD.
+ * Une participation est autorisée par jour civil.
+ */
+export function getCurrentDayKey() {
   const now = new Date();
 
-  const year =
-    now.getFullYear();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
 
-  const month = String(
-    now.getMonth() + 1
-  ).padStart(2, "0");
-
-  return year + "-" + month;
+  return `${year}-${month}-${day}`;
 }
 
-export function saveWheelReward(
-  reward: WheelReward
-) {
-  if (!isBrowser()) {
-    return;
-  }
+/**
+ * Sauvegarder une récompense.
+ */
+export function saveWheelReward(reward: WheelReward) {
+  if (!isBrowser()) return;
 
   localStorage.setItem(
     WHEEL_REWARD_KEY,
@@ -62,44 +52,35 @@ export function saveWheelReward(
   );
 
   window.dispatchEvent(
-    new Event(
-      "wheel-reward-updated"
-    )
+    new Event("wheel-reward-updated")
   );
 }
 
+/**
+ * Supprimer la récompense.
+ */
 export function removeWheelReward() {
-  if (!isBrowser()) {
-    return;
-  }
+  if (!isBrowser()) return;
 
-  localStorage.removeItem(
-    WHEEL_REWARD_KEY
-  );
+  localStorage.removeItem(WHEEL_REWARD_KEY);
 
   window.dispatchEvent(
-    new Event(
-      "wheel-reward-updated"
-    )
+    new Event("wheel-reward-updated")
   );
 }
 
-export function getWheelReward():
-  | WheelReward
-  | null {
-  if (!isBrowser()) {
-    return null;
-  }
+/**
+ * Récupérer la récompense sauvegardée.
+ */
+export function getWheelReward(): WheelReward | null {
+  if (!isBrowser()) return null;
 
   try {
-    const storedReward =
-      localStorage.getItem(
-        WHEEL_REWARD_KEY
-      );
+    const storedReward = localStorage.getItem(
+      WHEEL_REWARD_KEY
+    );
 
-    if (!storedReward) {
-      return null;
-    }
+    if (!storedReward) return null;
 
     const parsed = JSON.parse(
       storedReward
@@ -107,78 +88,62 @@ export function getWheelReward():
 
     if (
       !parsed ||
-      typeof parsed !==
-        "object" ||
-      typeof parsed.id !==
-        "string" ||
-      typeof parsed.label !==
-        "string" ||
-      typeof parsed.percentage !==
-        "number"
+      typeof parsed !== "object" ||
+      typeof parsed.id !== "string" ||
+      typeof parsed.label !== "string" ||
+      typeof parsed.percentage !== "number"
     ) {
       removeWheelReward();
       return null;
     }
 
-    /*
-      Compatibilité avec les anciennes
-      récompenses enregistrées avant
-      l'ajout de expiresAt.
-    */
-    let expiresAt =
-      Number(parsed.expiresAt);
+    // Compatibilité avec les anciennes récompenses.
+    let expiresAt = Number(parsed.expiresAt);
 
-    if (
-      !Number.isFinite(expiresAt)
-    ) {
+    if (!Number.isFinite(expiresAt)) {
       const createdAtTime =
-        typeof parsed.createdAt ===
-        "string"
-          ? new Date(
-              parsed.createdAt
-            ).getTime()
+        typeof parsed.createdAt === "string"
+          ? new Date(parsed.createdAt).getTime()
           : Date.now();
 
       expiresAt =
-        createdAtTime +
-        REWARD_DURATION_MS;
+        (Number.isFinite(createdAtTime)
+          ? createdAtTime
+          : Date.now()) + REWARD_DURATION_MS;
     }
 
-    const normalizedReward: WheelReward =
-      {
-        id: parsed.id,
-        label: parsed.label,
-        percentage:
-          parsed.percentage,
-        productName:
-          typeof parsed.productName ===
-          "string"
-            ? parsed.productName
-            : undefined,
-        used:
-          parsed.used === true,
-        createdAt:
-          typeof parsed.createdAt ===
-          "string"
-            ? parsed.createdAt
-            : new Date().toISOString(),
-        expiresAt,
-        usedAt:
-          typeof parsed.usedAt ===
-          "string"
-            ? parsed.usedAt
-            : undefined,
-      };
+    const createdAt =
+      typeof parsed.createdAt === "string" &&
+      Number.isFinite(
+        new Date(parsed.createdAt).getTime()
+      )
+        ? parsed.createdAt
+        : new Date().toISOString();
 
-    /*
-      Si la récompense n'est pas encore
-      utilisée mais que l'heure est passée,
-      elle est supprimée automatiquement.
-    */
+    const normalizedReward: WheelReward = {
+      id: parsed.id,
+      label: parsed.label,
+      percentage: Math.min(
+        100,
+        Math.max(0, parsed.percentage)
+      ),
+      productName:
+        typeof parsed.productName === "string"
+          ? parsed.productName
+          : undefined,
+      used: parsed.used === true,
+      createdAt,
+      expiresAt,
+      usedAt:
+        typeof parsed.usedAt === "string"
+          ? parsed.usedAt
+          : undefined,
+    };
+
+    // Supprimer automatiquement une récompense expirée.
     if (
       !normalizedReward.used &&
-      Date.now() >=
-        normalizedReward.expiresAt
+      Date.now() >= normalizedReward.expiresAt
     ) {
       removeWheelReward();
       return null;
@@ -191,16 +156,15 @@ export function getWheelReward():
   }
 }
 
+/**
+ * Créer une nouvelle récompense.
+ */
 export function createWheelReward(
   input: CreateWheelRewardInput
 ): WheelReward {
   const percentage = Math.min(
     100,
-    Math.max(
-      0,
-      Number(input.percentage) ||
-        0
-    )
+    Math.max(0, Number(input.percentage) || 0)
   );
 
   const now = Date.now();
@@ -210,13 +174,10 @@ export function createWheelReward(
     label: input.label,
     percentage,
     productName:
-      input.productName?.trim() ||
-      undefined,
+      input.productName?.trim() || undefined,
     used: false,
-    createdAt:
-      new Date(now).toISOString(),
-    expiresAt:
-      now + REWARD_DURATION_MS,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: now + REWARD_DURATION_MS,
   };
 
   saveWheelReward(reward);
@@ -224,57 +185,81 @@ export function createWheelReward(
   return reward;
 }
 
+/**
+ * Vérifier si une récompense est expirée.
+ */
 export function isWheelRewardExpired(
   reward: WheelReward
 ) {
-  return (
-    Date.now() >=
-    reward.expiresAt
-  );
+  return Date.now() >= reward.expiresAt;
 }
 
-export function hasSpunThisMonth() {
-  if (!isBrowser()) {
-    return false;
-  }
+/**
+ * Vérifier si le visiteur a déjà joué aujourd'hui.
+ */
+export function hasSpunToday() {
+  if (!isBrowser()) return false;
 
-  const storedMonth =
-    localStorage.getItem(
-      WHEEL_SPIN_MONTH_KEY
-    );
-
-  return (
-    storedMonth ===
-    getCurrentMonthKey()
+  const storedDay = localStorage.getItem(
+    WHEEL_SPIN_DAY_KEY
   );
+
+  return storedDay === getCurrentDayKey();
 }
 
-export function markSpinForCurrentMonth() {
-  if (!isBrowser()) {
-    return;
-  }
+/**
+ * Enregistrer la participation du jour.
+ */
+export function markSpinForToday() {
+  if (!isBrowser()) return;
 
   localStorage.setItem(
-    WHEEL_SPIN_MONTH_KEY,
-    getCurrentMonthKey()
+    WHEEL_SPIN_DAY_KEY,
+    getCurrentDayKey()
   );
 
   window.dispatchEvent(
-    new Event(
-      "wheel-spin-updated"
-    )
+    new Event("wheel-spin-updated")
   );
 }
 
-function normalizeProductName(
-  value: string
-) {
+/**
+ * Calculer le temps restant avant le prochain jour.
+ */
+export function getTimeUntilNextSpin(): number {
+  if (!isBrowser()) return 0;
+
+  const now = new Date();
+
+  const nextDay = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1,
+    0,
+    0,
+    0,
+    0
+  );
+
+  return Math.max(
+    0,
+    nextDay.getTime() - now.getTime()
+  );
+}
+
+/**
+ * Normaliser le nom d'un produit.
+ */
+function normalizeProductName(value: string) {
   return value
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ");
 }
 
+/**
+ * Vérifier si la récompense est applicable au produit.
+ */
 export function canUseRewardOnProduct(
   reward: WheelReward | null,
   productName: string
@@ -294,73 +279,58 @@ export function canUseRewardOnProduct(
     return false;
   }
 
-  /*
-    Si aucun produit n'est précisé,
-    la récompense est valable sur
-    tous les produits.
-  */
+  // Récompense valable sur tous les produits.
   if (!reward.productName) {
     return true;
   }
 
-  const rewardProduct =
-    normalizeProductName(
-      reward.productName
-    );
+  const rewardProduct = normalizeProductName(
+    reward.productName
+  );
 
-  const selectedProduct =
-    normalizeProductName(
-      productName
-    );
+  const selectedProduct = normalizeProductName(
+    productName
+  );
 
   return (
-    rewardProduct ===
-      selectedProduct ||
-    selectedProduct.includes(
-      rewardProduct
-    ) ||
-    rewardProduct.includes(
-      selectedProduct
-    )
+    rewardProduct === selectedProduct ||
+    selectedProduct.includes(rewardProduct) ||
+    rewardProduct.includes(selectedProduct)
   );
 }
 
+/**
+ * Calculer le prix après réduction.
+ */
 export function calculateRewardPrice(
   originalPrice: number,
   percentage: number
 ) {
   if (
-    !Number.isFinite(
-      originalPrice
-    ) ||
+    !Number.isFinite(originalPrice) ||
     originalPrice < 0
   ) {
     return 0;
   }
 
-  const safePercentage =
-    Math.min(
-      100,
-      Math.max(
-        0,
-        Number(percentage) || 0
-      )
-    );
+  const safePercentage = Math.min(
+    100,
+    Math.max(0, Number(percentage) || 0)
+  );
 
   const discountedPrice =
-    originalPrice *
-    (1 - safePercentage / 100);
+    originalPrice * (1 - safePercentage / 100);
 
-  return Number(
-    discountedPrice.toFixed(2)
-  );
+  return Number(discountedPrice.toFixed(2));
 }
 
+/**
+ * Utiliser une récompense.
+ */
 export function consumeWheelReward(
   productName?: string
 ) {
-  const reward =
-    getWheelReward();
+  const reward = getWheelReward();
 
   if (
     !reward ||
@@ -372,36 +342,28 @@ export function consumeWheelReward(
 
   if (
     productName &&
-    !canUseRewardOnProduct(
-      reward,
-      productName
-    )
+    !canUseRewardOnProduct(reward, productName)
   ) {
     return false;
   }
 
-  const consumedReward: WheelReward =
-    {
-      ...reward,
-      used: true,
-      usedAt:
-        new Date().toISOString(),
-    };
+  const consumedReward: WheelReward = {
+    ...reward,
+    used: true,
+    usedAt: new Date().toISOString(),
+  };
 
-  saveWheelReward(
-    consumedReward
-  );
+  saveWheelReward(consumedReward);
 
   return true;
 }
 
-/*
-  Alias utile si une autre page importe
-  encore useWheelReward.
-*/
+/**
+ * Ancien alias conservé pour compatibilité.
+ * Cette fonction consomme la récompense.
+ */
 export function useWheelReward() {
-  const reward =
-    getWheelReward();
+  const reward = getWheelReward();
 
   if (
     !reward ||
@@ -411,64 +373,65 @@ export function useWheelReward() {
     return null;
   }
 
-  const consumedReward: WheelReward =
-    {
-      ...reward,
-      used: true,
-      usedAt:
-        new Date().toISOString(),
-    };
+  const consumedReward: WheelReward = {
+    ...reward,
+    used: true,
+    usedAt: new Date().toISOString(),
+  };
 
-  saveWheelReward(
-    consumedReward
-  );
+  saveWheelReward(consumedReward);
 
   return consumedReward;
 }
 
-/*
-  Fonctions utiles pour les tests
-  depuis l'administration.
-*/
-
-export function resetMonthlyWheelSpin() {
-  if (!isBrowser()) {
-    return;
-  }
+/**
+ * Réinitialiser la participation quotidienne.
+ */
+export function resetDailyWheelSpin() {
+  if (!isBrowser()) return;
 
   localStorage.removeItem(
-    WHEEL_SPIN_MONTH_KEY
+    WHEEL_SPIN_DAY_KEY
   );
 
   window.dispatchEvent(
-    new Event(
-      "wheel-spin-updated"
-    )
+    new Event("wheel-spin-updated")
   );
 }
 
+/**
+ * Compatibilité avec les anciens imports mensuels.
+ */
+export function getCurrentMonthKey() {
+  return getCurrentDayKey();
+}
+
+export function hasSpunThisMonth() {
+  return hasSpunToday();
+}
+
+export function markSpinForCurrentMonth() {
+  markSpinForToday();
+}
+
+export function resetMonthlyWheelSpin() {
+  resetDailyWheelSpin();
+}
+
+/**
+ * Réinitialiser tout le système.
+ */
 export function resetWheelRewardSystem() {
-  if (!isBrowser()) {
-    return;
-  }
+  if (!isBrowser()) return;
 
-  localStorage.removeItem(
-    WHEEL_REWARD_KEY
-  );
+  localStorage.removeItem(WHEEL_REWARD_KEY);
+  localStorage.removeItem(WHEEL_SPIN_DAY_KEY);
 
-  localStorage.removeItem(
-    WHEEL_SPIN_MONTH_KEY
+  window.dispatchEvent(
+    new Event("wheel-reward-updated")
   );
 
   window.dispatchEvent(
-    new Event(
-      "wheel-reward-updated"
-    )
-  );
-
-  window.dispatchEvent(
-    new Event(
-      "wheel-spin-updated"
-    )
+    new Event("wheel-spin-updated")
   );
 }
