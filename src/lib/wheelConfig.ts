@@ -89,8 +89,12 @@ export const DEFAULT_WHEEL_PRIZES: WheelPrize[] = [
     active: true,
   },
   {
-    id: "try-again",
-    name: "Pas de chance",
-    label: "Pas de chance, réessayez demain !",
-    percentage: 25,
-    productName: "",
+  id: "try-again",
+  name: "Pas de chance",
+  label: "Pas de chance, réessayez demain !",
+  percentage: 25,
+  productName: "",
+  color: "#64748b",
+  active: true,
+  },
+];
