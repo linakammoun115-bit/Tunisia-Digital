@@ -1,3 +1,6 @@
+
+import { supabase } from "./supabase";
+
 export type Client = {
   id: string;
   name: string;
@@ -5,11 +8,43 @@ export type Client = {
   active: boolean;
 };
 
-export function getClients(): Client[] {
-  const saved = localStorage.getItem("clients");
-  return saved ? JSON.parse(saved) : [];
+export async function getClients(): Promise<Client[]> {
+  const { data, error } = await supabase
+    .from("clients")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return data ?? [];
 }
 
-export function saveClients(clients: Client[]) {
-  localStorage.setItem("clients", JSON.stringify(clients));
+export async function saveClient(client: {
+  name: string;
+  phone: string;
+}): Promise<Client> {
+  const { data, error } = await supabase
+    .from("clients")
+    .upsert(
+      {
+        name: client.name.trim(),
+        phone: client.phone.trim(),
+        active: true,
+      },
+      { onConflict: "phone" }
+    )
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+}
+
+export async function saveClients(clients: Client[]) {
+  const { error } = await supabase
+    .from("clients")
+    .upsert(clients, { onConflict: "phone" });
+
+  if (error) throw error;
 }
