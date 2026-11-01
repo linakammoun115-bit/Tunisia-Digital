@@ -31,11 +31,7 @@ import {
   savePendingCart,
 } from "@/lib/products";
 
-import {
-  getClients,
-  saveClients,
-} from "@/lib/clients";
-
+import { saveClient } from "@/lib/clients";
 import {
   calculateWheelRewardPrice,
   consumeWheelReward,
@@ -599,7 +595,7 @@ item.price < item.originalPrice
         paymentMethod
     );
 
-  const checkout = () => {
+  const checkout = async () => {
     const customerName =
       customer.name.trim();
 
@@ -660,9 +656,19 @@ item.price < item.originalPrice
           getItemTotal(item),
         0
       );
+const normalizedPhone = customerPhone.replace(/\s+/g, "");
+   // Ouvrir WhatsApp immédiatement pour éviter le blocage du popup.
+const whatsappWindow = window.open("about:blank", "_blank");
 
-    const clients =
-      getClients();
+// Enregistrer ou mettre à jour le client dans Supabase.
+try {
+  await saveClient({
+    name: customerName,
+    phone: normalizedPhone,
+  });
+} catch (error) {
+  console.error("Erreur enregistrement client :", error);
+}
 
     const normalizedPhone =
       customerPhone.replace(
@@ -826,13 +832,17 @@ item.price < item.originalPrice
         )
       );
 
-    window.open(
-      "https://wa.me/" +
-        WHATSAPP_NUMBER +
-        "?text=" +
-        text,
-      "_blank"
-    );
+   const whatsappUrl =
+  "https://wa.me/" +
+  WHATSAPP_NUMBER +
+  "?text=" +
+  text;
+
+if (whatsappWindow) {
+  whatsappWindow.location.href = whatsappUrl;
+} else {
+  window.open(whatsappUrl, "_blank");
+}
   };
 
   return (
