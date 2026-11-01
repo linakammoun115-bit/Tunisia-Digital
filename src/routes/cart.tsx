@@ -658,7 +658,7 @@ item.price < item.originalPrice
       );
 
    // Ouvrir WhatsApp immédiatement pour éviter le blocage du popup.
-const whatsappWindow = window.open("about:blank", "_blank");
+const whatsappWindow = window.open("https://wa.me/" + WHATSAPP_NUMBER, "_blank");
 
 // Enregistrer ou mettre à jour le client dans Supabase.
 try {
@@ -832,15 +832,12 @@ try {
         )
       );
 
-   const whatsappUrl =
-  "https://wa.me/" +
-  WHATSAPP_NUMBER +
-  "?text=" +
-  text;
+ const whatsappUrl =
+  "https://wa.me/qr/LIGJJK7BWAQMK1?text=" + text;
 
 if (whatsappWindow) {
   whatsappWindow.location.href = whatsappUrl;
-} else {
+}else {
   window.open(whatsappUrl, "_blank");
 }
   };
