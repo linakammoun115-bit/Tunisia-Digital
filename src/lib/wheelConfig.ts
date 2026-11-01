@@ -121,10 +121,23 @@ export const DEFAULT_WHEEL_PRIZES: WheelPrize[] = [
  * Ne pas confondre ces valeurs avec percentage,
  * qui représente uniquement la probabilité de gagner.
  */
+
 export function getWheelPrizeReward(
-  prize: Pick<WheelPrize, "id">
+  prize: Pick<WheelPrize, "id" | "name" | "label">
 ): WheelPrizeReward {
-  switch (prize.id) {
+  const id = prize.id.toLowerCase();
+  const text = `${prize.name} ${prize.label}`.toLowerCase();
+
+  // Récompense de 20 %
+  if (
+    id === "discount-20" ||
+    text.includes("20 %") ||
+    text.includes("20%")
+  ) {
+    return { type: "percent", value: 20 };
+  }
+
+  switch (id) {
     case "discount-5":
       return { type: "percent", value: 5 };
 
