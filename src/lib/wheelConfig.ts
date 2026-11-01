@@ -122,18 +122,18 @@ export const DEFAULT_WHEEL_PRIZES: WheelPrize[] = [
  * qui représente uniquement la probabilité de gagner.
  */
 
+
 export function getWheelPrizeReward(
-  prize: Pick<WheelPrize, "id" | "name" | "label">
+  prize: Pick<WheelPrize, "id"> &
+    Partial<Pick<WheelPrize, "name" | "label">>
 ): WheelPrizeReward {
   const id = prize.id.toLowerCase();
-  const text = `${prize.name} ${prize.label}`.toLowerCase();
+  const text = `${prize.name ?? ""} ${prize.label ?? ""}`.toLowerCase();
 
-  // Récompense de 20 %
-  if (
-    id === "discount-20" ||
-    text.includes("20 %") ||
-    text.includes("20%")
-  ) {
+  // Détecter les réductions en pourcentage depuis le nom ou le label.
+  const match = text.match(/(\d+(?:[.,]\d+)?)\s*%/);
+
+  if (id === "discount-20" || match?.[1] === "20") {
     return { type: "percent", value: 20 };
   }
 
@@ -164,6 +164,7 @@ export function getWheelPrizeReward(
       return { type: "none", value: 0 };
   }
 }
+
 
 function toWheelPrize(row: WheelPrizeRow): WheelPrize {
   return {
