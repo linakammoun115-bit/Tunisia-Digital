@@ -595,215 +595,138 @@ item.price < item.originalPrice
         paymentMethod
     );
 
-  const checkout = async () => {
-    const customerName =
-      customer.name.trim();
 
-    const customerPhone =
-      customer.phone.trim();
+const checkout = async () => {
+  const customerName = customer.name.trim();
+  const customerPhone = customer.phone.trim();
 
-    if (!customerName) {
-      alert(
-        "Le nom complet est obligatoire"
+  if (!customerName) {
+    alert("Le nom complet est obligatoire");
+    return;
+  }
+
+  if (!customerPhone) {
+    alert("Le numéro de téléphone est obligatoire");
+    return;
+  }
+
+  const verifiedCart = sanitizeCartRewards(cartItems);
+
+  if (!cartsAreEqual(verifiedCart, cartItems)) {
+    saveCart(verifiedCart);
+    alert("Votre promotion a expiré. Le panier a été actualisé avec le prix normal.");
+    return;
+  }
+
+  if (verifiedCart.length === 0) {
+    alert("Votre panier est vide");
+    return;
+  }
+
+  const checkoutTotal = verifiedCart.reduce(
+    (sum, item) => sum + getItemTotal(item),
+    0
+  );
+
+  // Normaliser le téléphone du client.
+  const normalizedPhone = customerPhone.replace(/\s+/g, "");
+
+  // Préparer les détails de la commande.
+  const order = verifiedCart
+    .map((item, index) => {
+      const itemTotal = getItemTotal(item);
+
+      const rewardText = item.wheelReward
+        ? "\n   🎁 " + item.wheelReward.label +
+          " appliquée sur la première unité"
+        : "";
+
+      return (
+        `${index + 1}. ${item.name} x${item.quantity} = ` +
+        `${formatPrice(itemTotal)} DT${rewardText}`
       );
-      return;
-    }
+    })
+    .join("\n");
 
-    if (!customerPhone) {
-      alert(
-        "Le numéro de téléphone est obligatoire"
-      );
-      return;
-    }
+  // Enregistrer la commande localement.
+  let orders: unknown[] = [];
 
-    /*
-      Vérification finale juste avant
-      de confirmer la commande.
-    */
-    const verifiedCart =
-      sanitizeCartRewards(
-        cartItems
-      );
-
-    if (
-      !cartsAreEqual(
-        verifiedCart,
-        cartItems
-      )
-    ) {
-      saveCart(verifiedCart);
-
-      alert(
-        "Votre promotion a expiré. Le panier a été actualisé avec le prix normal."
-      );
-
-      return;
-    }
-
-    if (
-      verifiedCart.length === 0
-    ) {
-      alert(
-        "Votre panier est vide"
-      );
-      return;
-    }
-
-    const checkoutTotal =
-      verifiedCart.reduce(
-        (sum, item) =>
-          sum +
-          getItemTotal(item),
-        0
-      );
-
-   // Ouvrir WhatsApp immédiatement pour éviter le blocage du popup.
-const whatsappWindow = window.open("https://wa.me/" + WHATSAPP_NUMBER, "_blank");
-
-// Enregistrer ou mettre à jour le client dans Supabase.
-try {
-  await saveClient({
-    name: customerName,
-    phone: normalizedPhone,
-  });
-} catch (error) {
-  console.error("Erreur enregistrement client :", error);
-}
-
-    const normalizedPhone =
-      customerPhone.replace(
-        /\s+/g,
-        ""
-      );
-
-    const existingClient =
-      clients.find(
-        (client) =>
-          String(
-            client.phone
-          ).replace(
-            /\s+/g,
-            ""
-          ) ===
-          normalizedPhone
-      );
-
-    if (!existingClient) {
-      saveClients([
-        ...clients,
-        {
-          id: Date.now().toString(),
-          name: customerName,
-          phone: customerPhone,
-          active: true,
-        },
-      ]);
-    }
-
-    const order =
-      verifiedCart
-        .map(
-          (
-            item,
-            index
-          ) => {
-            const itemTotal =
-              getItemTotal(item);
-
-            const rewardText =
-              item.wheelReward
-                ? "\n   🎁 " +
-                  item
-                    .wheelReward
-                    .label +
-                  " appliquée sur la première unité"
-                : "";
-
-            return (
-              String(
-                index + 1
-              ) +
-              ". " +
-              item.name +
-              " x" +
-              item.quantity +
-              " = " +
-              formatPrice(
-                itemTotal
-              ) +
-              " DT" +
-              rewardText
-            );
-          }
-        )
-        .join("\n");
-
-    let orders: unknown[] = [];
-
-    try {
-      const storedOrders =
-        JSON.parse(
-          localStorage.getItem(
-            "orders"
-          ) || "[]"
-        );
-
-      orders =
-        Array.isArray(
-          storedOrders
-        )
-          ? storedOrders
-          : [];
-    } catch {
-      orders = [];
-    }
-
-    orders.push({
-      id: Date.now(),
-      customer: {
-        name: customerName,
-        phone: customerPhone,
-      },
-      items: verifiedCart,
-      payment:
-        selectedPayment?.name ??
-        "Non sélectionné",
-      total: checkoutTotal,
-      date: new Date().toLocaleString(),
-    });
-
-    localStorage.setItem(
-      "orders",
-      JSON.stringify(orders)
+  try {
+    const storedOrders = JSON.parse(
+      localStorage.getItem("orders") || "[]"
     );
 
-    const verifiedRewardedItem =
-      verifiedCart.find(
-        (item) =>
-          item.wheelReward &&
-          (item.wheelReward.percentage > 0 ||
-            (item.wheelReward.discountAmount ?? 0) > 0) &&
-          item.originalPrice !==
-            undefined &&
-          item.price <
-            item.originalPrice
-      );
+    orders = Array.isArray(storedOrders) ? storedOrders : [];
+  } catch {
+    orders = [];
+  }
 
-    /*
-      La récompense est consommée
-      uniquement après la création
-      réussie de la commande.
-    */
-    if (
-      verifiedRewardedItem
-    ) {
-      consumeWheelReward(
-        verifiedRewardedItem.name
-      );
-    }
+  orders.push({
+    id: Date.now(),
+    customer: {
+      name: customerName,
+      phone: customerPhone,
+    },
+    items: verifiedCart,
+    payment: selectedPayment?.name ?? "Non sélectionné",
+    total: checkoutTotal,
+    date: new Date().toLocaleString(),
+  });
 
-    saveCart([]);
-    setRemainingTime(0);
+  localStorage.setItem("orders", JSON.stringify(orders));
+
+  // Préparer le message WhatsApp.
+  const messageLines = [
+    "Bonjour, je veux passer une commande ✅",
+    "",
+    "Client : " + customerName,
+    "Téléphone : " + customerPhone,
+    "",
+    "Détails de la commande :",
+    order,
+    "",
+    "Mode de paiement : " +
+      (selectedPayment?.name ?? "Non sélectionné"),
+    "Total : " + formatPrice(checkoutTotal) + " DT",
+  ];
+
+  const text = encodeURIComponent(messageLines.join("\n"));
+
+  // TON numéro WhatsApp professionnel.
+  const whatsappUrl =
+    "https://wa.me/21629734222?text=" + text;
+
+  // Enregistrer le client dans Supabase.
+  try {
+    await saveClient({
+      name: customerName,
+      phone: normalizedPhone,
+    });
+  } catch (error) {
+    console.error("Erreur enregistrement client :", error);
+  }
+
+  // Consommer la récompense après la création de la commande.
+  const verifiedRewardedItem = verifiedCart.find(
+    (item) =>
+      item.wheelReward &&
+      (item.wheelReward.percentage > 0 ||
+        (item.wheelReward.value ?? 0) > 0) &&
+      item.originalPrice !== undefined &&
+      item.price < item.originalPrice
+  );
+
+  if (verifiedRewardedItem) {
+    consumeWheelReward(verifiedRewardedItem.name);
+  }
+
+  saveCart([]);
+  setRemainingTime(0);
+
+  // Ouvrir directement la discussion WhatsApp avec le message.
+  window.location.href = whatsappUrl;
+};
+
 
     const messageLines = [
       "Bonjour, je veux passer une commande ✅",
