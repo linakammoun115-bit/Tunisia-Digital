@@ -37,7 +37,7 @@ import {
 } from "@/lib/clients";
 
 import {
-  calculateRewardPrice,
+  calculateWheelRewardPrice,
   consumeWheelReward,
   getWheelReward,
 } from "@/lib/wheelReward";
@@ -46,7 +46,8 @@ type WheelRewardInfo = {
   id: string;
   label: string;
   percentage: number;
-  discountAmount?: number;
+  type?: "percent" | "fixed";
+  value?: number;
   expiresAt?: number;
 };
 
@@ -144,31 +145,66 @@ function getStoredCartRaw(): CartItem[] {
   - suppression de wheelReward
   - retour au prix normal
 */
-function sanitizeCartRewards(items: CartItem[]): CartItem[] {
+function sanitizeCartRewards(
+  items: CartItem[]
+): CartItem[] {
   const activeReward = getWheelReward();
+
+  // Une seule récompense sur un seul article.
   let rewardAssigned = false;
 
   return items.map((item) => {
-    const storedPrice = Number(item.price) || 0;
-    const originalPrice = item.originalPrice !== undefined
-      ? Number(item.originalPrice) || storedPrice
-      : storedPrice;
-    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const storedPrice =
+      Number(item.price) || 0;
+
+    const originalPrice =
+      item.originalPrice !== undefined
+        ? Number(item.originalPrice) || storedPrice
+        : storedPrice;
+
+    const quantity = Math.max(
+      1,
+      Number(item.quantity) || 1
+    );
 
     if (!item.wheelReward) {
-      return { ...item, price: storedPrice, originalPrice, quantity, wheelReward: null };
+      return {
+        ...item,
+        price: storedPrice,
+        originalPrice,
+        quantity,
+        wheelReward: null,
+      };
     }
 
-    const rewardMatches = Boolean(
+    const rewardMatches =
       activeReward &&
       !activeReward.used &&
       activeReward.id === item.wheelReward.id &&
-      (activeReward.percentage > 0 || activeReward.discountAmount > 0) &&
-      activeReward.expiresAt > Date.now() &&
-      !rewardAssigned
-    );
+      (activeReward.type === "percent" ||
+        activeReward.type === "fixed") &&
+      activeReward.value > 0 &&
+      activeReward.expiresAt > Date.now();
 
-    if (!rewardMatches || !activeReward) {
+    // Récompense expirée, invalide ou déjà attribuée.
+    if (!rewardMatches || rewardAssigned) {
+      return {
+        ...item,
+        price: originalPrice,
+        originalPrice,
+        quantity,
+        wheelReward: null,
+      };
+    }
+
+    const discountedPrice =
+      calculateWheelRewardPrice(
+        originalPrice,
+        activeReward
+      );
+
+    // Ne pas attribuer une réduction inexistante.
+    if (discountedPrice >= originalPrice) {
       return {
         ...item,
         price: originalPrice,
@@ -179,11 +215,6 @@ function sanitizeCartRewards(items: CartItem[]): CartItem[] {
     }
 
     rewardAssigned = true;
-    const discountedPrice = calculateRewardPrice(
-      originalPrice,
-      activeReward.percentage,
-      activeReward.discountAmount
-    );
 
     return {
       ...item,
@@ -194,7 +225,8 @@ function sanitizeCartRewards(items: CartItem[]): CartItem[] {
         id: activeReward.id,
         label: activeReward.label,
         percentage: activeReward.percentage,
-        discountAmount: activeReward.discountAmount,
+        type: activeReward.type,
+        value: activeReward.value,
         expiresAt: activeReward.expiresAt,
       },
     };
@@ -553,13 +585,9 @@ function CartPage() {
       () =>
         cartItems.find(
           (item) =>
-            item.wheelReward &&
-            (item.wheelReward.percentage > 0 ||
-              (item.wheelReward.discountAmount ?? 0) > 0) &&
-            item.originalPrice !==
-              undefined &&
-            item.price <
-              item.originalPrice
+item.wheelReward &&
+item.originalPrice !== undefined &&
+item.price < item.originalPrice
         ),
       [cartItems]
     );
