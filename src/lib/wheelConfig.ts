@@ -1,14 +1,30 @@
 
 import { supabase } from "./supabase";
 
+export type WheelRewardType =
+  | "percent"
+  | "fixed"
+  | "gift"
+  | "promo_code"
+  | "next_order_percent"
+  | "none";
+
 export type WheelPrize = {
   id: string;
   name: string;
   label: string;
+
+  // Probabilité de gagner ce prix dans la roue.
   percentage: number;
+
   productName?: string;
   color: string;
   active: boolean;
+};
+
+export type WheelPrizeReward = {
+  type: WheelRewardType;
+  value: number;
 };
 
 type WheelPrizeRow = {
@@ -24,6 +40,7 @@ type WheelPrizeRow = {
 
 export const WHEEL_SEGMENTS = 8;
 
+// Valeurs et probabilités conservées exactement comme avant.
 export const DEFAULT_WHEEL_PRIZES: WheelPrize[] = [
   {
     id: "discount-5",
@@ -99,6 +116,42 @@ export const DEFAULT_WHEEL_PRIZES: WheelPrize[] = [
   },
 ];
 
+/**
+ * Retourne le type et la valeur réelle de la récompense.
+ * Ne pas confondre ces valeurs avec percentage,
+ * qui représente uniquement la probabilité de gagner.
+ */
+export function getWheelPrizeReward(
+  prize: Pick<WheelPrize, "id">
+): WheelPrizeReward {
+  switch (prize.id) {
+    case "discount-5":
+      return { type: "percent", value: 5 };
+
+    case "discount-1dt":
+      return { type: "fixed", value: 1 };
+
+    case "discount-10":
+      return { type: "percent", value: 10 };
+
+    case "discount-2dt":
+      return { type: "fixed", value: 2 };
+
+    case "surprise-gift":
+      return { type: "gift", value: 0 };
+
+    case "next-order-code":
+      return { type: "promo_code", value: 0 };
+
+    case "next-order-5":
+      return { type: "next_order_percent", value: 5 };
+
+    case "try-again":
+    default:
+      return { type: "none", value: 0 };
+  }
+}
+
 function toWheelPrize(row: WheelPrizeRow): WheelPrize {
   return {
     id: row.id,
@@ -146,7 +199,10 @@ export async function getWheelPrizes(): Promise<WheelPrize[]> {
 
 export async function getActiveWheelPrizes(): Promise<WheelPrize[]> {
   const prizes = await getWheelPrizes();
-  return prizes.filter((prize) => prize.active).slice(0, WHEEL_SEGMENTS);
+
+  return prizes
+    .filter((prize) => prize.active)
+    .slice(0, WHEEL_SEGMENTS);
 }
 
 export async function saveWheelPrizes(
