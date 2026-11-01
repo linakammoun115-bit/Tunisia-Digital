@@ -47,6 +47,7 @@ const KNOWN_PRIZE_IDS = new Set([
   "surprise-gift",
   "next-order-code",
   "next-order-5",
+  "discount-20",
   "try-again",
 ]);
 
@@ -171,9 +172,10 @@ export function getWheelReward(): WheelReward | null {
 
     // Corriger les récompenses déjà enregistrées.
     // On utilise l'ID, jamais la probabilité de la roue.
-    const knownPrize = KNOWN_PRIZE_IDS.has(parsed.id)
-      ? getWheelPrizeReward({ id: parsed.id })
-      : null;
+   const knownPrize = getWheelPrizeReward({
+  id: parsed.id,
+  label: parsed.label,
+});
 
     const rewardType: WheelRewardType =
       knownPrize?.type ??
@@ -243,9 +245,10 @@ export function createWheelReward(
 ): WheelReward {
   // Les IDs connus déterminent toujours la vraie récompense.
   // La probabilité percentage n'est jamais utilisée comme remise.
-  const knownPrize = KNOWN_PRIZE_IDS.has(input.id)
-    ? getWheelPrizeReward({ id: input.id })
-    : null;
+  const knownPrize = getWheelPrizeReward({
+  id: input.id,
+  label: input.label,
+});
 
   const rewardType: WheelRewardType =
     knownPrize?.type ??
