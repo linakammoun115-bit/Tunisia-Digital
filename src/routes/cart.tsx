@@ -656,7 +656,7 @@ item.price < item.originalPrice
           getItemTotal(item),
         0
       );
-const normalizedPhone = customerPhone.replace(/\s+/g, "");
+
    // Ouvrir WhatsApp immédiatement pour éviter le blocage du popup.
 const whatsappWindow = window.open("about:blank", "_blank");
 
