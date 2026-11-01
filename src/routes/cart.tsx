@@ -37,6 +37,7 @@ import {
 } from "@/lib/clients";
 
 import {
+  calculateRewardPrice,
   consumeWheelReward,
   getWheelReward,
 } from "@/lib/wheelReward";
@@ -45,6 +46,7 @@ type WheelRewardInfo = {
   id: string;
   label: string;
   percentage: number;
+  discountAmount?: number;
   expiresAt?: number;
 };
 
@@ -142,56 +144,31 @@ function getStoredCartRaw(): CartItem[] {
   - suppression de wheelReward
   - retour au prix normal
 */
-function sanitizeCartRewards(
-  items: CartItem[]
-): CartItem[] {
-  const activeReward =
-    getWheelReward();
+function sanitizeCartRewards(items: CartItem[]): CartItem[] {
+  const activeReward = getWheelReward();
+  let rewardAssigned = false;
 
   return items.map((item) => {
-    const storedPrice =
-      Number(item.price) || 0;
-
-    const originalPrice =
-      item.originalPrice !== undefined
-        ? Number(
-            item.originalPrice
-          ) || storedPrice
-        : storedPrice;
-
-    const quantity = Math.max(
-      1,
-      Number(item.quantity) || 1
-    );
+    const storedPrice = Number(item.price) || 0;
+    const originalPrice = item.originalPrice !== undefined
+      ? Number(item.originalPrice) || storedPrice
+      : storedPrice;
+    const quantity = Math.max(1, Number(item.quantity) || 1);
 
     if (!item.wheelReward) {
-      return {
-        ...item,
-        price: storedPrice,
-        originalPrice,
-        quantity,
-        wheelReward: null,
-      };
+      return { ...item, price: storedPrice, originalPrice, quantity, wheelReward: null };
     }
 
-    const rewardMatches =
+    const rewardMatches = Boolean(
       activeReward &&
       !activeReward.used &&
-      activeReward.id ===
-        item.wheelReward.id &&
-      Number(
-        activeReward.percentage
-      ) > 0 &&
-      Number(
-        activeReward.expiresAt
-      ) > Date.now();
+      activeReward.id === item.wheelReward.id &&
+      (activeReward.percentage > 0 || activeReward.discountAmount > 0) &&
+      activeReward.expiresAt > Date.now() &&
+      !rewardAssigned
+    );
 
-    /*
-      Si la récompense n'existe plus,
-      est utilisée ou est expirée,
-      on remet le prix normal.
-    */
-    if (!rewardMatches) {
+    if (!rewardMatches || !activeReward) {
       return {
         ...item,
         price: originalPrice,
@@ -201,16 +178,11 @@ function sanitizeCartRewards(
       };
     }
 
-    const percentage = Number(
-      activeReward.percentage
-    );
-
-    const discountedPrice = Number(
-      (
-        originalPrice -
-        originalPrice *
-          (percentage / 100)
-      ).toFixed(2)
+    rewardAssigned = true;
+    const discountedPrice = calculateRewardPrice(
+      originalPrice,
+      activeReward.percentage,
+      activeReward.discountAmount
     );
 
     return {
@@ -221,9 +193,9 @@ function sanitizeCartRewards(
       wheelReward: {
         id: activeReward.id,
         label: activeReward.label,
-        percentage,
-        expiresAt:
-          activeReward.expiresAt,
+        percentage: activeReward.percentage,
+        discountAmount: activeReward.discountAmount,
+        expiresAt: activeReward.expiresAt,
       },
     };
   });
@@ -582,8 +554,8 @@ function CartPage() {
         cartItems.find(
           (item) =>
             item.wheelReward &&
-            item.wheelReward
-              .percentage > 0 &&
+            (item.wheelReward.percentage > 0 ||
+              (item.wheelReward.discountAmount ?? 0) > 0) &&
             item.originalPrice !==
               undefined &&
             item.price <
@@ -775,8 +747,8 @@ function CartPage() {
       verifiedCart.find(
         (item) =>
           item.wheelReward &&
-          item.wheelReward
-            .percentage > 0 &&
+          (item.wheelReward.percentage > 0 ||
+            (item.wheelReward.discountAmount ?? 0) > 0) &&
           item.originalPrice !==
             undefined &&
           item.price <
@@ -1274,7 +1246,7 @@ function CartPage() {
               <Button
   onClick={(e) => {
     (window as any).fbq?.('track', 'Purchase');
-    checkout(e);
+    checkout();
   }}
   disabled={!customer.name.trim() || !customer.phone.trim()}
   className="h-12 w-full border-0 gradient-primary text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
