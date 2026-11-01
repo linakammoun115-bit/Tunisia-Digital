@@ -30,7 +30,6 @@ import { Link } from "@tanstack/react-router";
 import {
   calculateRewardPrice,
   canUseRewardOnProduct,
-  consumeWheelReward,
   getWheelReward,
   type WheelReward,
 } from "@/lib/wheelReward";
@@ -50,6 +49,7 @@ type Plan = {
   duration: string;
   accent: string;
   rewardDiscount: number;
+  rewardDiscountAmount: number;
 };
 
 type SocialService = SocialProduct;
@@ -142,14 +142,6 @@ function formatPrice(price: number): string {
     : price.toFixed(2);
 }
 
-function normalizeText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 /* =========================================================
    SOCIAL TYPE
@@ -177,117 +169,30 @@ function normalizeSocialType(
    REWARD
 ========================================================= */
 
+function getStoredCart(): any[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem("cart") || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function isRewardCompatible(
   reward: WheelReward | null,
   productName: string
 ): boolean {
-  if (!reward || reward.used) {
-    return false;
-  }
-
-  const normalizedLabel = normalizeText(
-    reward.label
+  if (!reward || reward.used) return false;
+  const alreadyReserved = getStoredCart().some(
+    (item) => item?.wheelReward?.id === reward.id
   );
-
-  const normalizedProduct =
-    normalizeText(productName);
-
-  if (
-    normalizedLabel.includes(
-      "5% sur votre achat"
-    )
-  ) {
-    return true;
-  }
-
-  if (
-    normalizedLabel.includes(
-      "2k followers"
-    )
-  ) {
-    const cleanProductName =
-      normalizedProduct
-        .replace(
-          /\s*\(followers\)\s*$/,
-          ""
-        )
-        .trim();
-
-    return (
-      cleanProductName ===
-      "2k followers"
-    );
-  }
-
-  if (
-    normalizedLabel.includes(
-      "gemini"
-    )
-  ) {
-    return normalizedProduct.includes(
-      "gemini"
-    );
-  }
-
-  if (
-    normalizedLabel.includes(
-      "spotify"
-    )
-  ) {
-    return normalizedProduct.includes(
-      "spotify"
-    );
-  }
-
-  if (
-    normalizedLabel.includes(
-      "canva"
-    )
-  ) {
-    return normalizedProduct.includes(
-      "canva"
-    );
-  }
-
-  if (
-    normalizedLabel.includes(
-      "linkedin"
-    )
-  ) {
-    return normalizedProduct.includes(
-      "linkedin"
-    );
-  }
-
-  return canUseRewardOnProduct(
-    reward,
-    productName
-  );
+  if (alreadyReserved) return false;
+  return canUseRewardOnProduct(reward, productName);
 }
 
 /* =========================================================
    CART
 ========================================================= */
-
-function getStoredCart(): any[] {
-  try {
-    const savedCart =
-      localStorage.getItem("cart");
-
-    if (!savedCart) {
-      return [];
-    }
-
-    const parsed =
-      JSON.parse(savedCart);
-
-    return Array.isArray(parsed)
-      ? parsed
-      : [];
-  } catch {
-    return [];
-  }
-}
 
 /* =========================================================
    ADD SOCIAL PRODUCT TO CART
@@ -315,7 +220,8 @@ function addSocialToCart(
     rewardCanBeUsed && reward
       ? calculateRewardPrice(
           service.price,
-          reward.percentage
+          reward.percentage,
+          reward.discountAmount
         )
       : service.price;
 
@@ -363,6 +269,8 @@ function addSocialToCart(
                       reward.label,
                     percentage:
                       reward.percentage,
+                    discountAmount:
+                      reward.discountAmount,
                   }
                 : null,
           },
@@ -374,10 +282,7 @@ function addSocialToCart(
   );
 
   if (rewardCanBeUsed) {
-    consumeWheelReward(
-      productName
-    );
-
+    // La récompense reste active jusqu'à la validation de la commande.
     onRewardUsed();
   }
 
@@ -437,7 +342,8 @@ function SocialSection({
               wheelReward
                 ? calculateRewardPrice(
                     service.price,
-                    wheelReward.percentage
+                    wheelReward.percentage,
+                    wheelReward.discountAmount
                   )
                 : service.price;
 
@@ -456,10 +362,7 @@ function SocialSection({
 
                     {rewardCanBeUsed && (
                       <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-success">
-                        🎁 -
-                        {wheelReward?.percentage ??
-                          0}
-                        %
+                        🎁 {wheelReward?.label}
                       </span>
                     )}
                   </div>
@@ -909,9 +812,12 @@ export function Subscriptions() {
                 );
 
               const rewardDiscount =
-                rewardCanBeUsed &&
-                wheelReward
+                rewardCanBeUsed && wheelReward
                   ? wheelReward.percentage
+                  : 0;
+              const rewardDiscountAmount =
+                rewardCanBeUsed && wheelReward
+                  ? wheelReward.discountAmount
                   : 0;
 
               /*
@@ -926,7 +832,8 @@ export function Subscriptions() {
                 originalPrice > 0
                   ? calculateRewardPrice(
                       originalPrice,
-                      rewardDiscount
+                      rewardDiscount,
+                      rewardDiscountAmount
                     )
                   : originalPrice;
 
@@ -946,6 +853,7 @@ export function Subscriptions() {
                 accent:
                   "from-primary to-accent",
                 rewardDiscount,
+                rewardDiscountAmount,
               };
             }
           )
@@ -1296,15 +1204,12 @@ export function Subscriptions() {
                         <Icon className="h-6 w-6 text-primary-foreground" />
                       </div>
 
-                      {plan.rewardDiscount >
-                        0 &&
+                      {(plan.rewardDiscount > 0 || plan.rewardDiscountAmount > 0) &&
                         hasPrice && (
                           <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-success">
-                            🎁 -
-                            {
-                              plan.rewardDiscount
-                            }
-                            %
+                            🎁 {plan.rewardDiscount > 0
+                              ? `-${plan.rewardDiscount}%`
+                              : `-${formatPrice(plan.rewardDiscountAmount)} DT`}
                           </span>
                         )}
                     </div>
@@ -1321,8 +1226,7 @@ export function Subscriptions() {
                       }
                     </h3>
 
-                    {plan.rewardDiscount >
-                      0 &&
+                    {(plan.rewardDiscount > 0 || plan.rewardDiscountAmount > 0) &&
                       hasPrice && (
                         <div className="mb-3 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
                           🎁 Offre roue
@@ -1352,8 +1256,7 @@ export function Subscriptions() {
                               </span>
                             </div>
 
-                            {plan.rewardDiscount >
-                              0 && (
+                            {(plan.rewardDiscount > 0 || plan.rewardDiscountAmount > 0) && (
                               <span className="mb-1 text-sm text-muted-foreground line-through">
                                 {formatPrice(
                                   plan.originalPrice
