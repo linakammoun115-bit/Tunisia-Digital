@@ -1,7 +1,21 @@
+
+import {
+  getWheelPrizeReward,
+  type WheelRewardType,
+} from "./wheelConfig";
+
 export type WheelReward = {
   id: string;
   label: string;
+
+  // Type et valeur réelle de la récompense.
+  type: WheelRewardType;
+  value: number;
+
+  // Compatibilité : pourcentage réel de réduction.
+  // Ce n'est jamais la probabilité de gagner.
   percentage: number;
+
   productName?: string;
   used: boolean;
   createdAt: string;
@@ -12,18 +26,53 @@ export type WheelReward = {
 export type CreateWheelRewardInput = {
   id: string;
   label: string;
-  percentage: number;
   productName?: string;
+
+  // Paramètres facultatifs pour les anciens appels.
+  percentage?: number;
+  type?: WheelRewardType;
+  value?: number;
 };
 
 const WHEEL_REWARD_KEY = "wheel-reward";
 const WHEEL_SPIN_DAY_KEY = "wheel-spin-day";
 
 const REWARD_DURATION_MS = 60 * 60 * 1000;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+const KNOWN_PRIZE_IDS = new Set([
+  "discount-5",
+  "discount-1dt",
+  "discount-10",
+  "discount-2dt",
+  "surprise-gift",
+  "next-order-code",
+  "next-order-5",
+  "try-again",
+]);
 
 function isBrowser() {
   return typeof window !== "undefined";
+}
+
+function isRewardType(value: unknown): value is WheelRewardType {
+  return (
+    value === "percent" ||
+    value === "fixed" ||
+    value === "gift" ||
+    value === "promo_code" ||
+    value === "next_order_percent" ||
+    value === "none"
+  );
+}
+
+function normalizeValue(value: unknown, fallback = 0): number {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return Math.max(0, number);
 }
 
 /**
@@ -71,6 +120,8 @@ export function removeWheelReward() {
 
 /**
  * Récupérer la récompense sauvegardée.
+ * Les anciennes récompenses sont converties automatiquement
+ * à partir de leur ID pour corriger les anciennes valeurs.
  */
 export function getWheelReward(): WheelReward | null {
   if (!isBrowser()) return null;
@@ -90,43 +141,62 @@ export function getWheelReward(): WheelReward | null {
       !parsed ||
       typeof parsed !== "object" ||
       typeof parsed.id !== "string" ||
-      typeof parsed.label !== "string" ||
-      typeof parsed.percentage !== "number"
+      typeof parsed.label !== "string"
     ) {
       removeWheelReward();
       return null;
     }
 
-    // Compatibilité avec les anciennes récompenses.
+    const now = Date.now();
+
     let expiresAt = Number(parsed.expiresAt);
 
     if (!Number.isFinite(expiresAt)) {
       const createdAtTime =
         typeof parsed.createdAt === "string"
           ? new Date(parsed.createdAt).getTime()
-          : Date.now();
+          : now;
 
       expiresAt =
         (Number.isFinite(createdAtTime)
           ? createdAtTime
-          : Date.now()) + REWARD_DURATION_MS;
+          : now) + REWARD_DURATION_MS;
     }
 
     const createdAt =
       typeof parsed.createdAt === "string" &&
-      Number.isFinite(
-        new Date(parsed.createdAt).getTime()
-      )
+      Number.isFinite(new Date(parsed.createdAt).getTime())
         ? parsed.createdAt
-        : new Date().toISOString();
+        : new Date(now).toISOString();
+
+    // Corriger les récompenses déjà enregistrées.
+    // On utilise l'ID, jamais la probabilité de la roue.
+    const knownPrize = KNOWN_PRIZE_IDS.has(parsed.id)
+      ? getWheelPrizeReward({ id: parsed.id })
+      : null;
+
+    const rewardType: WheelRewardType =
+      knownPrize?.type ??
+      (isRewardType(parsed.type) ? parsed.type : "percent");
+
+    const legacyValue = normalizeValue(parsed.percentage);
+
+    const value = knownPrize
+      ? knownPrize.value
+      : normalizeValue(parsed.value, legacyValue);
+
+    const actualPercentage =
+      rewardType === "percent" ||
+      rewardType === "next_order_percent"
+        ? value
+        : 0;
 
     const normalizedReward: WheelReward = {
       id: parsed.id,
       label: parsed.label,
-      percentage: Math.min(
-        100,
-        Math.max(0, parsed.percentage)
-      ),
+      type: rewardType,
+      value,
+      percentage: actualPercentage,
       productName:
         typeof parsed.productName === "string"
           ? parsed.productName
@@ -143,10 +213,19 @@ export function getWheelReward(): WheelReward | null {
     // Supprimer automatiquement une récompense expirée.
     if (
       !normalizedReward.used &&
-      Date.now() >= normalizedReward.expiresAt
+      now >= normalizedReward.expiresAt
     ) {
       removeWheelReward();
       return null;
+    }
+
+    // Mettre à jour le stockage avec le nouveau format.
+    if (
+      parsed.type !== normalizedReward.type ||
+      parsed.value !== normalizedReward.value ||
+      parsed.percentage !== normalizedReward.percentage
+    ) {
+      saveWheelReward(normalizedReward);
     }
 
     return normalizedReward;
@@ -162,16 +241,37 @@ export function getWheelReward(): WheelReward | null {
 export function createWheelReward(
   input: CreateWheelRewardInput
 ): WheelReward {
-  const percentage = Math.min(
-    100,
-    Math.max(0, Number(input.percentage) || 0)
-  );
+  // Les IDs connus déterminent toujours la vraie récompense.
+  // La probabilité percentage n'est jamais utilisée comme remise.
+  const knownPrize = KNOWN_PRIZE_IDS.has(input.id)
+    ? getWheelPrizeReward({ id: input.id })
+    : null;
+
+  const rewardType: WheelRewardType =
+    knownPrize?.type ??
+    input.type ??
+    "percent";
+
+  const value = knownPrize
+    ? knownPrize.value
+    : normalizeValue(
+        input.value,
+        normalizeValue(input.percentage)
+      );
+
+  const percentage =
+    rewardType === "percent" ||
+    rewardType === "next_order_percent"
+      ? value
+      : 0;
 
   const now = Date.now();
 
   const reward: WheelReward = {
     id: input.id,
     label: input.label,
+    type: rewardType,
+    value,
     percentage,
     productName:
       input.productName?.trim() || undefined,
@@ -259,6 +359,7 @@ function normalizeProductName(value: string) {
 
 /**
  * Vérifier si la récompense est applicable au produit.
+ * Seules les réductions immédiates sont applicables au panier.
  */
 export function canUseRewardOnProduct(
   reward: WheelReward | null,
@@ -273,8 +374,19 @@ export function canUseRewardOnProduct(
   }
 
   if (
-    reward.percentage <= 0 ||
-    reward.percentage > 100
+    reward.type !== "percent" &&
+    reward.type !== "fixed"
+  ) {
+    return false;
+  }
+
+  if (reward.value <= 0) {
+    return false;
+  }
+
+  if (
+    reward.type === "percent" &&
+    reward.value > 100
   ) {
     return false;
   }
@@ -300,7 +412,8 @@ export function canUseRewardOnProduct(
 }
 
 /**
- * Calculer le prix après réduction.
+ * Calculer le prix après réduction en pourcentage.
+ * Fonction conservée pour compatibilité avec les anciens imports.
  */
 export function calculateRewardPrice(
   originalPrice: number,
@@ -325,7 +438,56 @@ export function calculateRewardPrice(
 }
 
 /**
+ * Calculer le prix avec le vrai type de récompense.
+ * 5 % et 10 % : remise en pourcentage.
+ * 1 DT et 2 DT : remise fixe.
+ */
+export function calculateWheelRewardPrice(
+  originalPrice: number,
+  reward: WheelReward | null
+) {
+  if (
+    !Number.isFinite(originalPrice) ||
+    originalPrice < 0
+  ) {
+    return 0;
+  }
+
+  if (!reward) {
+    return Number(originalPrice.toFixed(2));
+  }
+
+  if (
+    reward.type === "percent" &&
+    reward.value > 0 &&
+    reward.value <= 100
+  ) {
+    return calculateRewardPrice(
+      originalPrice,
+      reward.value
+    );
+  }
+
+  if (
+    reward.type === "fixed" &&
+    reward.value > 0
+  ) {
+    const discountedPrice = Math.max(
+      0,
+      originalPrice - reward.value
+    );
+
+    return Number(discountedPrice.toFixed(2));
+  }
+
+  // Cadeau, code promo et réduction du prochain achat
+  // ne diminuent pas le prix du panier actuel.
+  return Number(originalPrice.toFixed(2));
+}
+
+/**
  * Utiliser une récompense.
+ * À appeler uniquement après validation de la commande.
  */
 export function consumeWheelReward(
   productName?: string
@@ -336,6 +498,13 @@ export function consumeWheelReward(
     !reward ||
     reward.used ||
     isWheelRewardExpired(reward)
+  ) {
+    return false;
+  }
+
+  if (
+    reward.type !== "percent" &&
+    reward.type !== "fixed"
   ) {
     return false;
   }
