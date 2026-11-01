@@ -1,4 +1,3 @@
-
 import {
   createFileRoute,
   Link,
@@ -25,10 +24,13 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+
 import {
   addWheelPrize,
   deleteWheelPrize,
   getWheelPrizes,
+  saveWheelPrizes,
   subscribeToWheelPrizes,
   updateWheelPrize,
   type WheelPrize,
@@ -55,6 +57,8 @@ type PrizeForm = {
   name: string;
   label: string;
   percentage: string;
+  discountPercentage: string;
+  discountAmount: string;
   productName: string;
   color: string;
   active: boolean;
@@ -64,6 +68,8 @@ const EMPTY_FORM: PrizeForm = {
   name: "",
   label: "",
   percentage: "",
+  discountPercentage: "",
+  discountAmount: "",
   productName: "",
   color: DEFAULT_COLORS[0],
   active: true,
@@ -78,69 +84,131 @@ function getErrorMessage(error: unknown) {
 }
 
 function AdminWheelPage() {
-  const [prizes, setPrizes] = useState<WheelPrize[]>([]);
-  const [form, setForm] = useState<PrizeForm>(EMPTY_FORM);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [prizes, setPrizes] =
+    useState<WheelPrize[]>([]);
 
-  const activeCount = useMemo(
-    () => prizes.filter((prize) => prize.active).length,
-    [prizes]
+  const [form, setForm] =
+    useState<PrizeForm>(EMPTY_FORM);
+
+  const [editingId, setEditingId] =
+    useState<string | null>(null);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const loadPrizes = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
+      }
+
+      try {
+        const data =
+          await getWheelPrizes();
+
+        setPrizes(data);
+      } catch (error) {
+        setMessage(
+          getErrorMessage(error)
+        );
+      } finally {
+        if (showLoading) {
+          setLoading(false);
+        }
+      }
+    },
+    []
   );
-
-  const loadPrizes = useCallback(async () => {
-    try {
-      const data = await getWheelPrizes();
-      setPrizes(data);
-      setMessage("");
-    } catch (error) {
-      setMessage(getErrorMessage(error));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     void loadPrizes();
 
-    const unsubscribe = subscribeToWheelPrizes(() => {
-      void loadPrizes();
-    });
+    const unsubscribe =
+      subscribeToWheelPrizes(() => {
+        void loadPrizes(false);
+      });
 
-    return () => {
-      unsubscribe();
-    };
+    return unsubscribe;
   }, [loadPrizes]);
+
+  const activePrizes = useMemo(
+    () =>
+      prizes.filter(
+        (prize) => prize.active
+      ),
+    [prizes]
+  );
+
+  const activeCount =
+    activePrizes.length;
+
+  const totalPercentage = activePrizes.reduce(
+    (total, prize) =>
+      total + Number(prize.percentage || 0),
+    0
+  );
+
+  const displayedTotalPercentage =
+    Number(totalPercentage.toFixed(2));
+
+  const wheelIsValid =
+    activeCount === MAX_ACTIVE_PRIZES &&
+    Math.abs(
+      totalPercentage - 100
+    ) < 0.001;
+
+  function updateForm<
+    Key extends keyof PrizeForm,
+  >(
+    key: Key,
+    value: PrizeForm[Key]
+  ) {
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
 
   function resetForm() {
     setForm(EMPTY_FORM);
     setEditingId(null);
   }
 
-  function startEditing(prize: WheelPrize) {
-    setEditingId(prize.id);
-    setForm({
-      name: prize.name,
-      label: prize.label,
-      percentage: String(prize.percentage),
-      productName: prize.productName || "",
-      color: prize.color,
-      active: prize.active,
-    });
+  function showMessage(
+    text: string
+  ) {
+    setMessage(text);
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(() => {
+      setMessage("");
+    }, 4000);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
-    setMessage("");
 
-    const percentage = Number(form.percentage);
+    const percentage =
+      Number(form.percentage);
 
-    if (!form.name.trim() || !form.label.trim()) {
-      setMessage("Veuillez remplir le nom et le libellé.");
+    if (!form.name.trim()) {
+      showMessage(
+        "Ajoutez le nom de la récompense."
+      );
+      return;
+    }
+
+    if (!form.label.trim()) {
+      showMessage(
+        "Ajoutez le texte affiché dans la roue."
+      );
       return;
     }
 
@@ -149,26 +217,54 @@ function AdminWheelPage() {
       percentage < 0 ||
       percentage > 100
     ) {
-      setMessage("La probabilité doit être comprise entre 0 et 100.");
+      showMessage(
+        "La probabilité doit être comprise entre 0 et 100 %."
+      );
       return;
     }
 
-    if (
-      form.active &&
-      !editingId &&
-      activeCount >= MAX_ACTIVE_PRIZES
-    ) {
-      setMessage("La roue ne peut pas contenir plus de 8 lots actifs.");
+    if (form.active && percentage <= 0) {
+      showMessage(
+        "Une récompense active doit avoir une probabilité supérieure à 0 %."
+      );
       return;
     }
 
-    if (
+    const editedPrize =
+      editingId
+        ? prizes.find(
+            (prize) =>
+              prize.id === editingId
+          )
+        : undefined;
+
+    const activatingNewPrize =
       form.active &&
-      editingId &&
-      !prizes.find((prize) => prize.id === editingId)?.active &&
+      (!editedPrize ||
+        !editedPrize.active);
+
+    if (
+      activatingNewPrize &&
       activeCount >= MAX_ACTIVE_PRIZES
     ) {
-      setMessage("La roue ne peut pas contenir plus de 8 lots actifs.");
+      showMessage(
+        "La roue contient déjà 8 récompenses actives."
+      );
+      return;
+    }
+
+    const discountPercentage = Number(form.discountPercentage || 0);
+    const discountAmount = Number(form.discountAmount || 0);
+
+    if (
+      !Number.isFinite(discountPercentage) ||
+      discountPercentage < 0 ||
+      discountPercentage > 100 ||
+      !Number.isFinite(discountAmount) ||
+      discountAmount < 0 ||
+      (discountPercentage > 0 && discountAmount > 0)
+    ) {
+      showMessage("Choisissez une remise en pourcentage OU une remise fixe en DT, pas les deux.");
       return;
     }
 
@@ -176,8 +272,14 @@ function AdminWheelPage() {
       name: form.name.trim(),
       label: form.label.trim(),
       percentage,
-      productName: form.productName.trim(),
-      color: form.color,
+      discountPercentage,
+      discountAmount,
+      productName:
+        form.productName.trim() ||
+        undefined,
+      color:
+        form.color.trim() ||
+        DEFAULT_COLORS[0],
       active: form.active,
     };
 
@@ -185,358 +287,799 @@ function AdminWheelPage() {
 
     try {
       if (editingId) {
-        await updateWheelPrize(editingId, prizeData);
-        setMessage("Récompense modifiée avec succès.");
+        await updateWheelPrize(
+          editingId,
+          prizeData
+        );
+
+        showMessage(
+          "Récompense modifiée avec succès."
+        );
       } else {
-        await addWheelPrize(prizeData);
-        setMessage("Récompense ajoutée avec succès.");
+        await addWheelPrize(
+          prizeData
+        );
+
+        showMessage(
+          "Récompense ajoutée avec succès."
+        );
       }
 
       resetForm();
-      await loadPrizes();
+
+      await loadPrizes(false);
     } catch (error) {
-      setMessage(getErrorMessage(error));
+      showMessage(
+        getErrorMessage(error)
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm("Voulez-vous vraiment supprimer cette récompense ?")) {
+  function handleEdit(
+    prize: WheelPrize
+  ) {
+    setEditingId(prize.id);
+
+    setForm({
+      name: prize.name,
+      label: prize.label,
+      percentage:
+        prize.percentage.toString(),
+      discountPercentage:
+        prize.discountPercentage.toString(),
+      discountAmount:
+        prize.discountAmount.toString(),
+      productName:
+        prize.productName || "",
+      color: prize.color,
+      active: prize.active,
+    });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  async function handleDelete(
+    prize: WheelPrize
+  ) {
+   const confirmed = window.confirm(
+  `Voulez-vous vraiment supprimer "${prize.name}" ?`
+);
+
+    if (!confirmed) {
       return;
     }
 
-    setMessage("");
     setSaving(true);
 
     try {
-      await deleteWheelPrize(id);
-      setMessage("Récompense supprimée avec succès.");
-      await loadPrizes();
+      await deleteWheelPrize(
+        prize.id
+      );
 
-      if (editingId === id) {
+      if (
+        editingId === prize.id
+      ) {
         resetForm();
       }
+
+      await loadPrizes(false);
+
+      showMessage(
+        "Récompense supprimée."
+      );
     } catch (error) {
-      setMessage(getErrorMessage(error));
+      showMessage(
+        getErrorMessage(error)
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  async function toggleActive(prize: WheelPrize) {
-    if (!prize.active && activeCount >= MAX_ACTIVE_PRIZES) {
-      setMessage("Maximum 8 récompenses actives.");
+  async function handleToggleActive(
+    prize: WheelPrize
+  ) {
+    if (
+      !prize.active &&
+      activeCount >= MAX_ACTIVE_PRIZES
+    ) {
+      showMessage(
+        "Vous avez déjà 8 récompenses actives."
+      );
       return;
     }
 
-    setMessage("");
+    setSaving(true);
 
     try {
-      await updateWheelPrize(prize.id, {
-        active: !prize.active,
-      });
-      await loadPrizes();
+      await updateWheelPrize(
+        prize.id,
+        {
+          active:
+            !prize.active,
+        }
+      );
+
+      await loadPrizes(false);
+
+      showMessage(
+        prize.active
+          ? "Récompense désactivée."
+          : "Récompense activée."
+      );
     } catch (error) {
-      setMessage(getErrorMessage(error));
+      showMessage(
+        getErrorMessage(error)
+      );
+    } finally {
+      setSaving(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center gap-3">
-        <Loader2 className="h-6 w-6 animate-spin" />
-        <span>Chargement des récompenses...</span>
-      </div>
-    );
+  async function handleSaveOrder() {
+    if (!wheelIsValid) {
+      showMessage(
+        "Il faut exactement 8 récompenses actives avec un total de 100 %."
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await saveWheelPrizes(
+        prizes
+      );
+
+      await loadPrizes(false);
+
+      showMessage(
+        "Configuration enregistrée sur tous les appareils."
+      );
+    } catch (error) {
+      showMessage(
+        getErrorMessage(error)
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function movePrize(
+    index: number,
+    direction: -1 | 1
+  ) {
+    const targetIndex =
+      index + direction;
+
+    if (
+      targetIndex < 0 ||
+      targetIndex >= prizes.length
+    ) {
+      return;
+    }
+
+    const updated = [...prizes];
+
+    [
+      updated[index],
+      updated[targetIndex],
+    ] = [
+      updated[targetIndex],
+      updated[index],
+    ];
+
+    setPrizes(updated);
+    setSaving(true);
+
+    try {
+      await saveWheelPrizes(
+        updated
+      );
+
+      showMessage(
+        "Ordre enregistré."
+      );
+    } catch (error) {
+      setPrizes(prizes);
+
+      showMessage(
+        getErrorMessage(error)
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="mx-auto max-w-5xl">
-        <Link
-          to="/admin"
-          className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Retour à l'administration
-        </Link>
-
-        <div className="mb-8 flex items-center gap-3">
-          <div className="rounded-xl bg-purple-100 p-3 text-purple-700">
-            <Gift className="h-7 w-7" />
-          </div>
-
+    <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6 md:px-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">
+            <Link
+              to="/admin"
+              className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-primary"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour au dashboard
+            </Link>
+
+            <h1 className="text-3xl font-bold sm:text-4xl">
               Gestion de la roue
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Gérez les cadeaux et les réductions.
+
+            <p className="mt-2 text-sm text-muted-foreground">
+              Configurez exactement 8 récompenses actives.
+              La somme de leurs probabilités doit être égale à 100 %.
             </p>
           </div>
-        </div>
+
+          <Button
+            type="button"
+            onClick={() => {
+              void handleSaveOrder();
+            }}
+            variant="outline"
+            disabled={
+              saving ||
+              loading ||
+              !wheelIsValid
+            }
+          >
+            {saving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+
+            Enregistrer
+          </Button>
+        </header>
 
         {message && (
-          <div className="mb-5 flex items-center gap-2 rounded-lg border p-3 text-sm">
-            <XCircle className="h-5 w-5 shrink-0" />
-            <span>{message}</span>
-            <button
-              type="button"
-              className="ml-auto"
-              onClick={() => setMessage("")}
-            >
-              <X className="h-4 w-4" />
-            </button>
+          <div className="mb-6 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
+            {message}
           </div>
         )}
 
-        <div className="mb-6 grid grid-cols-2 gap-4">
-          <div className="rounded-xl border bg-card p-4">
-            <p className="text-sm text-muted-foreground">
-              Total des récompenses
-            </p>
-            <p className="mt-1 text-2xl font-bold">
-              {prizes.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border bg-card p-4">
+        <section className="mb-8 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border bg-card p-6 shadow-sm">
             <p className="text-sm text-muted-foreground">
               Récompenses actives
             </p>
-            <p className="mt-1 text-2xl font-bold">
-              {activeCount}/{MAX_ACTIVE_PRIZES}
+
+            <p
+              className={`mt-3 text-4xl font-bold ${
+                activeCount ===
+                MAX_ACTIVE_PRIZES
+                  ? "text-green-500"
+                  : "text-red-500"
+              }`}
+            >
+              {activeCount} / 8
             </p>
           </div>
-        </div>
 
-        <section className="mb-8 rounded-xl border bg-card p-5">
-          <h2 className="mb-5 flex items-center gap-2 text-lg font-semibold">
-            {editingId ? (
-              <>
-                <Edit3 className="h-5 w-5" />
-                Modifier une récompense
-              </>
-            ) : (
-              <>
-                <Plus className="h-5 w-5" />
-                Ajouter une récompense
-              </>
+          <div className="rounded-2xl border bg-card p-6 shadow-sm">
+            <p className="text-sm text-muted-foreground">
+              Total des probabilités
+            </p>
+
+            <p
+              className={`mt-3 text-4xl font-bold ${
+                Math.abs(
+                  totalPercentage -
+                    100
+                ) < 0.001
+                  ? "text-green-500"
+                  : "text-red-500"
+              }`}
+            >
+              {displayedTotalPercentage} %
+            </p>
+          </div>
+
+          <div className="rounded-2xl border bg-card p-6 shadow-sm">
+            <p className="text-sm text-muted-foreground">
+              État de la roue
+            </p>
+
+            <div className="mt-3 flex items-center gap-2">
+              {wheelIsValid ? (
+                <>
+                  <CheckCircle2 className="h-7 w-7 text-green-500" />
+
+                  <p className="text-xl font-bold text-green-500">
+                    Prête
+                  </p>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-7 w-7 text-red-500" />
+
+                  <p className="text-xl font-bold text-red-500">
+                    Incorrecte
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {!wheelIsValid && (
+          <section className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
+            <h2 className="font-bold text-red-500">
+              Configuration incomplète
+            </h2>
+
+            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+              {activeCount !==
+                MAX_ACTIVE_PRIZES && (
+                <p>
+                  Il faut exactement 8
+                  récompenses actives.
+                </p>
+              )}
+
+              {Math.abs(
+                totalPercentage - 100
+              ) >= 0.001 && (
+                <p>
+                 La somme des probabilités des récompenses actives
+doit être exactement égale à 100 %.
+                </p>
+              )}
+            </div>
+          </section>
+        )}
+
+        <section className="mb-8 rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">
+                {editingId
+                  ? "Modifier la récompense"
+                  : "Ajouter une récompense"}
+              </h2>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+               Configurez la récompense, le produit concerné,
+la probabilité de gagner et la couleur du segment.
+              </p>
+            </div>
+
+            {editingId && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={resetForm}
+                disabled={saving}
+              >
+                <X className="h-5 w-5" />
+              </Button>
             )}
-          </h2>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Nom de la récompense
-                </label>
+          <form
+            onSubmit={(event) => {
+              void handleSubmit(
+                event
+              );
+            }}
+            className="grid gap-5 md:grid-cols-2"
+          >
+            <label className="space-y-2">
+              <span className="text-sm font-semibold">
+                Nom de la récompense
+              </span>
+
+              <input
+                value={form.name}
+                onChange={(event) =>
+                  updateForm(
+                    "name",
+                    event.target.value
+                  )
+                }
+                placeholder="Ex: Gemini Pro"
+                className="h-11 w-full rounded-xl border bg-background px-4 outline-none transition focus:border-primary"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-semibold">
+                Produit concerné
+              </span>
+
+              <input
+                value={
+                  form.productName
+                }
+                onChange={(event) =>
+                  updateForm(
+                    "productName",
+                    event.target.value
+                  )
+                }
+                placeholder="Ex: Spotify Premium"
+                className="h-11 w-full rounded-xl border bg-background px-4 outline-none transition focus:border-primary"
+              />
+            </label>
+
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-semibold">
+                Texte affiché dans la roue
+              </span>
+
+              <input
+                value={form.label}
+                onChange={(event) =>
+                  updateForm(
+                    "label",
+                    event.target.value
+                  )
+                }
+                placeholder="Ex: Spotify Premium -10%"
+                className="h-11 w-full rounded-xl border bg-background px-4 outline-none transition focus:border-primary"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-semibold">
+                Probabilité de gagner (%)
+              </span>
+
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={
+                  form.percentage
+                }
+                onChange={(event) =>
+                  updateForm(
+                    "percentage",
+                    event.target.value
+                  )
+                }
+                placeholder="Ex: 10"
+                className="h-11 w-full rounded-xl border bg-background px-4 outline-none transition focus:border-primary"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cette valeur représente la chance de gagner cette récompense,
+                et non le montant de la réduction offerte.
+              </p>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-semibold">Réduction réelle (%)</span>
+              <input type="number" min="0" max="100" step="0.5" value={form.discountPercentage}
+                onChange={(event) => updateForm("discountPercentage", event.target.value)}
+                placeholder="Ex: 10" className="h-11 w-full rounded-xl border bg-background px-4 outline-none transition focus:border-primary" />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-semibold">Réduction fixe (DT)</span>
+              <input type="number" min="0" step="0.1" value={form.discountAmount}
+                onChange={(event) => updateForm("discountAmount", event.target.value)}
+                placeholder="Ex: 1" className="h-11 w-full rounded-xl border bg-background px-4 outline-none transition focus:border-primary" />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-semibold">
+                Couleur
+              </span>
+
+              <div className="flex h-11 items-center gap-3 rounded-xl border bg-background px-3">
                 <input
-                  required
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm({ ...form, name: e.target.value })
+                  type="color"
+                  value={form.color}
+                  onChange={(event) =>
+                    updateForm(
+                      "color",
+                      event.target.value
+                    )
                   }
-                  placeholder="Ex : Réduction 10 %"
-                  className="w-full rounded-lg border bg-background px-3 py-2"
+                  className="h-8 w-12 cursor-pointer border-0 bg-transparent"
+                />
+
+                <input
+                  value={form.color}
+                  onChange={(event) =>
+                    updateForm(
+                      "color",
+                      event.target.value
+                    )
+                  }
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
                 />
               </div>
+            </label>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Texte affiché sur la roue
-                </label>
-                <input
-                  required
-                  value={form.label}
-                  onChange={(e) =>
-                    setForm({ ...form, label: e.target.value })
-                  }
-                  placeholder="Ex : 10 % de réduction"
-                  className="w-full rounded-lg border bg-background px-3 py-2"
-                />
-              </div>
+            <div className="md:col-span-2">
+              <p className="mb-3 text-sm font-semibold">
+                Couleurs rapides
+              </p>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Probabilité (%)
-                </label>
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={form.percentage}
-                  onChange={(e) =>
-                    setForm({ ...form, percentage: e.target.value })
-                  }
-                  placeholder="Ex : 20"
-                  className="w-full rounded-lg border bg-background px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Produit concerné (facultatif)
-                </label>
-                <input
-                  value={form.productName}
-                  onChange={(e) =>
-                    setForm({ ...form, productName: e.target.value })
-                  }
-                  placeholder="Nom du produit"
-                  className="w-full rounded-lg border bg-background px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Couleur
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={form.color}
-                    onChange={(e) =>
-                      setForm({ ...form, color: e.target.value })
-                    }
-                    className="h-10 w-16 cursor-pointer"
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {form.color}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 pt-6">
-                <input
-                  id="prize-active"
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) =>
-                    setForm({ ...form, active: e.target.checked })
-                  }
-                  className="h-4 w-4"
-                />
-                <label htmlFor="prize-active" className="text-sm font-medium">
-                  Récompense active
-                </label>
+              <div className="flex flex-wrap gap-3">
+                {DEFAULT_COLORS.map(
+                  (color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      aria-label={`Choisir ${color}`}
+                      onClick={() =>
+                        updateForm(
+                          "color",
+                          color
+                        )
+                      }
+                      className={`h-10 w-10 rounded-full border-4 transition hover:scale-110 ${
+                        form.color === color
+                          ? "border-primary"
+                          : "border-white/20"
+                      }`}
+                      style={{
+                        backgroundColor:
+                          color,
+                      }}
+                    />
+                  )
+                )}
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3 pt-2">
-              <button
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl border bg-background p-4 md:col-span-2">
+              <input
+                type="checkbox"
+                checked={form.active}
+                onChange={(event) =>
+                  updateForm(
+                    "active",
+                    event.target.checked
+                  )
+                }
+                className="h-5 w-5 accent-primary"
+              />
+
+              <div>
+                <p className="font-semibold">
+                  Récompense active
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  Elle apparaîtra dans une
+                  partie de la roue.
+                </p>
+              </div>
+            </label>
+
+            <div className="flex flex-wrap gap-3 md:col-span-2">
+              <Button
                 type="submit"
+                className="gradient-primary border-0"
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
                 {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : editingId ? (
+                  <Save className="mr-2 h-4 w-4" />
                 ) : (
-                  <Save className="h-4 w-4" />
+                  <Plus className="mr-2 h-4 w-4" />
                 )}
-                {editingId ? "Enregistrer les modifications" : "Ajouter"}
-              </button>
+
+                {editingId
+                  ? "Enregistrer les modifications"
+                  : "Ajouter la récompense"}
+              </Button>
 
               {editingId && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={resetForm}
-                  className="inline-flex items-center gap-2 rounded-lg border px-5 py-2.5 hover:bg-muted"
+                  disabled={saving}
                 >
-                  <X className="h-4 w-4" />
                   Annuler
-                </button>
+                </Button>
               )}
             </div>
           </form>
         </section>
 
-        <section className="rounded-xl border bg-card p-5">
-          <h2 className="mb-5 text-lg font-semibold">
-            Liste des récompenses
-          </h2>
+        <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
+          <div className="border-b p-5 sm:p-7">
+            <h2 className="text-2xl font-bold">
+              Récompenses configurées
+            </h2>
 
-          {prizes.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">
-              Aucune récompense trouvée.
+            <p className="mt-1 text-sm text-muted-foreground">
+              Les récompenses sont
+              enregistrées dans Supabase et
+              partagées avec tous les
+              appareils.
             </p>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center gap-3 p-12 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              Chargement...
+            </div>
+          ) : prizes.length === 0 ? (
+            <div className="p-12 text-center text-muted-foreground">
+              <Gift className="mx-auto mb-4 h-10 w-10" />
+              Aucune récompense configurée.
+            </div>
           ) : (
-            <div className="space-y-3">
-              {prizes.map((prize) => (
-                <div
-                  key={prize.id}
-                  className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center"
-                >
-                  <div
-                    className="h-12 w-12 shrink-0 rounded-lg border"
-                    style={{ backgroundColor: prize.color }}
-                  />
+            <div className="divide-y">
+              {prizes.map(
+                (prize, index) => (
+                  <article
+                    key={prize.id}
+                    className="grid gap-4 p-5 sm:p-6 lg:grid-cols-[60px_1fr_auto] lg:items-center"
+                  >
+                    <div
+                      className="h-14 w-14 rounded-2xl border-4 border-white/20 shadow"
+                      style={{
+                        backgroundColor:
+                          prize.color,
+                      }}
+                    />
 
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold">{prize.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {prize.label}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Probabilité : {prize.percentage} %
-                      {prize.productName
-                        ? ` • Produit : ${prize.productName}`
-                        : ""}
-                    </p>
-                  </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-lg font-bold">
+                          {prize.name}
+                        </h3>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
-                        prize.active
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {prize.active ? (
-                        <CheckCircle2 className="h-3 w-3" />
-                      ) : (
-                        <XCircle className="h-3 w-3" />
-                      )}
-                      {prize.active ? "Active" : "Inactive"}
-                    </span>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-bold ${
+                            prize.active
+                              ? "bg-green-500/15 text-green-500"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {prize.active
+                            ? "Active"
+                            : "Inactive"}
+                        </span>
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={() => void toggleActive(prize)}
-                      className="rounded-lg border px-3 py-2 text-sm hover:bg-muted"
-                    >
-                      {prize.active ? "Désactiver" : "Activer"}
-                    </button>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {prize.label}
+                      </p>
 
-                    <button
-                      type="button"
-                      onClick={() => startEditing(prize)}
-                      className="rounded-lg border p-2 hover:bg-muted"
-                      title="Modifier"
-                    >
-                      <Edit3 className="h-4 w-4" />
-                    </button>
+                      <div className="mt-3 flex flex-wrap gap-4 text-sm">
+                        <span>
+                          Produit:{" "}
+                          <strong>
+                            {prize.productName ||
+                              "Tous les produits"}
+                          </strong>
+                        </span>
 
-                    <button
-                      type="button"
-                      onClick={() => void handleDelete(prize.id)}
-                      disabled={saving}
-                      className="rounded-lg border p-2 text-red-600 hover:bg-red-50"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                        <span>
+                          Probabilité:{" "}
+                          <strong>
+                            {prize.percentage} %
+                          </strong>
+                        </span>
+
+                        <span>
+                          Réduction: {" "}
+                          <strong>
+                            {prize.discountPercentage > 0
+                              ? `${prize.discountPercentage} %`
+                              : prize.discountAmount > 0
+                                ? `${prize.discountAmount} DT`
+                                : "Aucune"}
+                          </strong>
+                        </span>
+
+                        <span className="font-mono">
+                          {prize.color}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 lg:justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          saving ||
+                          index === 0
+                        }
+                        onClick={() => {
+                          void movePrize(
+                            index,
+                            -1
+                          );
+                        }}
+                      >
+                        ↑
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          saving ||
+                          index ===
+                            prizes.length -
+                              1
+                        }
+                        onClick={() => {
+                          void movePrize(
+                            index,
+                            1
+                          );
+                        }}
+                      >
+                        ↓
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={saving}
+                        onClick={() => {
+                          void handleToggleActive(
+                            prize
+                          );
+                        }}
+                      >
+                        {prize.active
+                          ? "Désactiver"
+                          : "Activer"}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={saving}
+                        onClick={() =>
+                          handleEdit(
+                            prize
+                          )
+                        }
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={saving}
+                        onClick={() => {
+                          void handleDelete(
+                            prize
+                          );
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </article>
+                )
+              )}
             </div>
           )}
         </section>
       </div>
-    </div>
+    </main>
   );
 }
