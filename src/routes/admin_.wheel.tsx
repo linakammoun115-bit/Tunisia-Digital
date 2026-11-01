@@ -94,3 +94,33 @@ function AdminWheelPage() {
 
   const [loading, setLoading] =
     useState(true);
+    return (
+    <div className="min-h-screen p-6">
+      <div className="mx-auto max-w-5xl">
+        <Link
+          to="/admin"
+          className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Retour
+        </Link>
+
+        <div className="mb-6 flex items-center gap-3">
+          <Gift className="h-7 w-7" />
+          <h1 className="text-2xl font-bold">
+            Gestion de la roue
+          </h1>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Chargement...
+          </div>
+        ) : (
+          <p>Gestion des cadeaux et des réductions.</p>
+        )}
+      </div>
+    </div>
+  );
+}
