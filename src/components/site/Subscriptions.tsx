@@ -28,7 +28,7 @@ import { Button } from "../ui/button";
 import { Link } from "@tanstack/react-router";
 
 import {
-  calculateRewardPrice,
+  calculateWheelRewardPrice,
   canUseRewardOnProduct,
   getWheelReward,
   type WheelReward,
@@ -182,12 +182,19 @@ function isRewardCompatible(
   reward: WheelReward | null,
   productName: string
 ): boolean {
-  if (!reward || reward.used) return false;
-  const alreadyReserved = getStoredCart().some(
-    (item) => item?.wheelReward?.id === reward.id
+  if (
+    !reward ||
+    reward.used ||
+    (reward.type !== "percent" &&
+      reward.type !== "fixed")
+  ) {
+    return false;
+  }
+
+  return canUseRewardOnProduct(
+    reward,
+    productName
   );
-  if (alreadyReserved) return false;
-  return canUseRewardOnProduct(reward, productName);
 }
 
 /* =========================================================
@@ -216,14 +223,13 @@ function addSocialToCart(
       productName
     );
 
-  const finalPrice =
-    rewardCanBeUsed && reward
-      ? calculateRewardPrice(
-          service.price,
-          reward.percentage,
-          reward.discountAmount
-        )
-      : service.price;
+ const finalPrice =
+  rewardCanBeUsed && reward
+    ? calculateWheelRewardPrice(
+        service.price,
+        reward
+      )
+    : service.price;
 
   const slug =
     `social-${type}-${service.name}`
@@ -260,19 +266,16 @@ function addSocialToCart(
             duration:
               "Social Boost",
             quantity: 1,
-            wheelReward:
-              rewardCanBeUsed &&
-              reward
-                ? {
-                    id: reward.id,
-                    label:
-                      reward.label,
-                    percentage:
-                      reward.percentage,
-                    discountAmount:
-                      reward.discountAmount,
-                  }
-                : null,
+          wheelReward: rewardCanBeUsed && reward
+  ? {
+      id: reward.id,
+      label: reward.label,
+      percentage: reward.percentage,
+      type: reward.type,
+      value: reward.value,
+      expiresAt: reward.expiresAt,
+    }
+  : null,
           },
         ];
 
@@ -280,12 +283,9 @@ function addSocialToCart(
     "cart",
     JSON.stringify(updatedCart)
   );
-
   if (rewardCanBeUsed) {
-    // La récompense reste active jusqu'à la validation de la commande.
-    onRewardUsed();
-  }
-
+  onRewardUsed();
+}
   window.dispatchEvent(
     new Event("cart-updated")
   );
@@ -337,15 +337,13 @@ function SocialSection({
                 productName
               );
 
-            const displayedPrice =
-              rewardCanBeUsed &&
-              wheelReward
-                ? calculateRewardPrice(
-                    service.price,
-                    wheelReward.percentage,
-                    wheelReward.discountAmount
-                  )
-                : service.price;
+           const displayedPrice =
+  rewardCanBeUsed && wheelReward
+    ? calculateWheelRewardPrice(
+        service.price,
+        wheelReward
+      )
+    : service.price;
 
             return (
               <article
@@ -827,15 +825,15 @@ export function Subscriptions() {
                * Dans le rendu, on affichera
                * "Prix non disponible".
                */
-              const finalPrice =
-                rewardCanBeUsed &&
-                originalPrice > 0
-                  ? calculateRewardPrice(
-                      originalPrice,
-                      rewardDiscount,
-                      rewardDiscountAmount
-                    )
-                  : originalPrice;
+             const finalPrice =
+  rewardCanBeUsed &&
+  wheelReward &&
+  originalPrice > 0
+    ? calculateWheelRewardPrice(
+        originalPrice,
+        wheelReward
+      )
+    : originalPrice;
 
               return {
                 name: product.name,
