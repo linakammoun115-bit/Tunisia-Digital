@@ -57,7 +57,9 @@ type WheelSegment = {
   id: string;
   name: string;
   label: string;
-  percentage: number;
+  probability: number;
+  discountPercentage: number;
+  discountAmount: number;
   productName: string;
   color: string;
 };
@@ -167,8 +169,10 @@ function WheelGame() {
             id: prize.id,
             name: prize.name,
             label: prize.label,
-            percentage: prize.percentage,
-            productName: prize.productName || prize.name,
+            probability: prize.percentage,
+            discountPercentage: prize.discountPercentage,
+            discountAmount: prize.discountAmount,
+            productName: prize.productName || "",
             color: prize.color || FALLBACK_COLORS[index],
           };
         }
@@ -177,8 +181,10 @@ function WheelGame() {
           id: "empty-" + index,
           name: "Produit " + (index + 1),
           label: "À configurer",
-          percentage: 0,
-          productName: "Produit " + (index + 1),
+          probability: 0,
+          discountPercentage: 0,
+          discountAmount: 0,
+          productName: "",
           color: FALLBACK_COLORS[index],
         };
       }
@@ -207,7 +213,7 @@ function WheelGame() {
     // --- 1. Choix basé sur les pourcentages ---
     let totalWeight = 0;
     segments.forEach((segment) => {
-      totalWeight += Number(segment.percentage || 0);
+      totalWeight += Number(segment.probability || 0);
     });
 
     const randomNum = Math.random() * totalWeight;
@@ -216,8 +222,8 @@ function WheelGame() {
     let winningIndex = 0; 
 
     for (let i = 0; i < segments.length; i++) {
-      weightSum += Number(segments[i].percentage || 0);
-      if (randomNum <= weightSum) {
+      weightSum += Number(segments[i].probability || 0);
+      if (randomNum < weightSum) {
         winningIndex = i;
         break;
       }
@@ -241,7 +247,8 @@ function WheelGame() {
       const reward = createWheelReward({
         id: winningPrize.id,
         label: winningPrize.label,
-        percentage: winningPrize.percentage,
+        percentage: winningPrize.discountPercentage,
+        discountAmount: winningPrize.discountAmount,
         productName: winningPrize.productName,
       });
 
@@ -315,7 +322,7 @@ function WheelGame() {
             Roue des <span className="gradient-text">cadeaux</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-            Tourne la roue et gagne une réduction sur l’un de nos produits. Une seule participation est autorisée par mois.
+            Tourne la roue et gagne un cadeau ou une réduction sur l’un de nos produits. Une seule participation est autorisée par jour.
           </p>
         </section>
 
@@ -336,7 +343,7 @@ function WheelGame() {
                 </p>
               </div>
               <div className="rounded-2xl border bg-background/60 p-5">
-                <p className="text-sm text-muted-foreground">Total des remises</p>
+                <p className="text-sm text-muted-foreground">Total des probabilités</p>
                 <p className="mt-2 text-3xl font-bold text-red-500">
                   {totalPercentage} %
                 </p>
@@ -347,7 +354,7 @@ function WheelGame() {
                 <p>Il faut exactement huit récompenses actives.</p>
               )}
               {Math.abs(totalPercentage - 100) >= 0.001 && (
-                <p>Le total des pourcentages saisis dans l’Admin doit être égal à 100 %.</p>
+                <p>Le total des probabilités saisies dans l’Admin doit être égal à 100 %.</p>
               )}
             </div>
           </section>
@@ -406,7 +413,7 @@ function WheelGame() {
                 >
                   <div className="max-w-full rounded-lg bg-black/25 px-2 py-1.5 shadow-lg backdrop-blur-[2px]">
                     <p className="line-clamp-2 text-[9px] font-black uppercase leading-tight sm:text-[10px] md:text-xs">
-                      {segment.productName}
+                      {segment.productName || "Tous produits"}
                     </p>
                     <p className="mt-1 line-clamp-2 text-[8px] font-semibold leading-tight text-white/90 sm:text-[9px] md:text-[10px]">
                       {segment.label}
@@ -461,7 +468,7 @@ function WheelGame() {
         {alreadySpun && !spinning && (
           <div className="mx-auto mt-5 flex max-w-md items-center justify-center gap-2 text-sm text-muted-foreground">
             <CalendarClock className="h-4 w-4" />
-            Tu pourras rejouer le mois prochain.
+            Tu pourras rejouer demain.
           </div>
         )}
 
@@ -476,7 +483,7 @@ function WheelGame() {
             )}
             <p className="gradient-text mt-2 text-xl font-bold">{result}</p>
             <p className="mt-3 text-sm text-muted-foreground">
-              Ton offre est disponible dans la page des produits. Elle sera utilisée une seule fois.
+              Ton lot est enregistré. Si tu as gagné une réduction, elle sera proposée sur le premier produit compatible ajouté au panier.
             </p>
             <Button className="gradient-primary mt-5 border-0" asChild>
               <Link to="/#subscriptions">Voir les produits</Link>
