@@ -267,11 +267,15 @@ function AdminPage() {
      CLIENTS
   ========================================================= */
 
-  const [
-    clients,
-    setClients,
-  ] = useState<Client[]>(getClients);
+const [clients, setClients] = useState<Client[]>([]);
 
+useEffect(() => {
+  getClients()
+    .then(setClients)
+    .catch((error) => {
+      console.error("Erreur chargement clients :", error);
+    });
+}, []);
   const [
     newClient,
     setNewClient,
