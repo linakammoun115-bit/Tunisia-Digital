@@ -1,3 +1,4 @@
+
 import {
   createFileRoute,
   Link,
@@ -26,12 +27,9 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-
-import {
-  savePendingCart,
-} from "@/lib/products";
-
+import { savePendingCart } from "@/lib/products";
 import { saveClient } from "@/lib/clients";
+
 import {
   calculateWheelRewardPrice,
   consumeWheelReward,
@@ -50,16 +48,10 @@ type WheelRewardInfo = {
 type CartItem = {
   slug: string;
   name: string;
-
-  // Prix payé pour la première unité.
   price: number;
-
-  // Prix normal avant réduction.
   originalPrice?: number;
-
   duration: string;
   quantity: number;
-
   wheelReward?: WheelRewardInfo | null;
 };
 
@@ -71,8 +63,7 @@ type PaymentMethod = {
   badge: string;
 };
 
-const WHATSAPP_NUMBER =
-  "21629734222";
+const WHATSAPP_NUMBER = "21629734222";
 
 const paymentMethods: PaymentMethod[] = [
   {
@@ -105,14 +96,11 @@ const paymentMethods: PaymentMethod[] = [
   },
 ];
 
-export const Route =
-  createFileRoute("/cart")({
-    component: CartPage,
-  });
+export const Route = createFileRoute("/cart")({
+  component: CartPage,
+});
 
-function formatPrice(
-  price: number
-) {
+function formatPrice(price: number) {
   return Number.isInteger(price)
     ? String(price)
     : price.toFixed(2);
@@ -121,37 +109,21 @@ function formatPrice(
 function getStoredCartRaw(): CartItem[] {
   try {
     const parsed = JSON.parse(
-      localStorage.getItem("cart") ||
-        "[]"
+      localStorage.getItem("cart") || "[]"
     );
 
-    return Array.isArray(parsed)
-      ? parsed
-      : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-/*
-  Vérifie si la récompense liée à un article
-  est toujours disponible et non expirée.
-
-  Si elle est expirée :
-  - suppression de wheelReward
-  - retour au prix normal
-*/
-function sanitizeCartRewards(
-  items: CartItem[]
-): CartItem[] {
+function sanitizeCartRewards(items: CartItem[]): CartItem[] {
   const activeReward = getWheelReward();
-
-  // Une seule récompense sur un seul article.
   let rewardAssigned = false;
 
   return items.map((item) => {
-    const storedPrice =
-      Number(item.price) || 0;
+    const storedPrice = Number(item.price) || 0;
 
     const originalPrice =
       item.originalPrice !== undefined
@@ -182,7 +154,6 @@ function sanitizeCartRewards(
       activeReward.value > 0 &&
       activeReward.expiresAt > Date.now();
 
-    // Récompense expirée, invalide ou déjà attribuée.
     if (!rewardMatches || rewardAssigned) {
       return {
         ...item,
@@ -193,13 +164,11 @@ function sanitizeCartRewards(
       };
     }
 
-    const discountedPrice =
-      calculateWheelRewardPrice(
-        originalPrice,
-        activeReward
-      );
+    const discountedPrice = calculateWheelRewardPrice(
+      originalPrice,
+      activeReward
+    );
 
-    // Ne pas attribuer une réduction inexistante.
     if (discountedPrice >= originalPrice) {
       return {
         ...item,
@@ -230,31 +199,12 @@ function sanitizeCartRewards(
 }
 
 function getStoredCart(): CartItem[] {
-  return sanitizeCartRewards(
-    getStoredCartRaw()
-  );
+  return sanitizeCartRewards(getStoredCartRaw());
 }
 
-/*
-  La récompense est valable sur une seule unité.
-
-  Première unité :
-  prix réduit.
-
-  Unités suivantes :
-  prix normal.
-*/
-function getItemTotal(
-  item: CartItem
-) {
-  const quantity = Math.max(
-    1,
-    item.quantity
-  );
-
-  const normalPrice =
-    item.originalPrice ??
-    item.price;
+function getItemTotal(item: CartItem) {
+  const quantity = Math.max(1, item.quantity);
+  const normalPrice = item.originalPrice ?? item.price;
 
   if (
     item.wheelReward &&
@@ -262,56 +212,27 @@ function getItemTotal(
   ) {
     return (
       item.price +
-      normalPrice *
-        (quantity - 1)
+      normalPrice * (quantity - 1)
     );
   }
 
   return item.price * quantity;
 }
 
-function formatRemainingTime(
-  milliseconds: number
-) {
-  const safeTime = Math.max(
-    0,
-    milliseconds
-  );
+function formatRemainingTime(milliseconds: number) {
+  const safeTime = Math.max(0, milliseconds);
+  const totalSeconds = Math.floor(safeTime / 1000);
 
-  const totalSeconds =
-    Math.floor(
-      safeTime / 1000
-    );
-
-  const hours =
-    Math.floor(
-      totalSeconds / 3600
-    );
-
-  const minutes =
-    Math.floor(
-      (totalSeconds % 3600) /
-        60
-    );
-
-  const seconds =
-    totalSeconds % 60;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
 
   return (
-    String(hours).padStart(
-      2,
-      "0"
-    ) +
+    String(hours).padStart(2, "0") +
     ":" +
-    String(minutes).padStart(
-      2,
-      "0"
-    ) +
+    String(minutes).padStart(2, "0") +
     ":" +
-    String(seconds).padStart(
-      2,
-      "0"
-    )
+    String(seconds).padStart(2, "0")
   );
 }
 
@@ -319,41 +240,22 @@ function cartsAreEqual(
   first: CartItem[],
   second: CartItem[]
 ) {
-  return (
-    JSON.stringify(first) ===
-    JSON.stringify(second)
-  );
+  return JSON.stringify(first) === JSON.stringify(second);
 }
 
 function CartPage() {
-  const [
-    cartItems,
-    setCartItems,
-  ] = useState<CartItem[]>([]);
-
-  const [
-    paymentMethod,
-    setPaymentMethod,
-  ] = useState(
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState(
     paymentMethods[0].id
   );
+  const [remainingTime, setRemainingTime] = useState(0);
 
-  const [
-    remainingTime,
-    setRemainingTime,
-  ] = useState(0);
-
-  const [
-    customer,
-    setCustomer,
-  ] = useState({
+  const [customer, setCustomer] = useState({
     name: "",
     phone: "",
   });
 
-  const saveCart = (
-    items: CartItem[]
-  ) => {
+  const saveCart = (items: CartItem[]) => {
     setCartItems(items);
 
     localStorage.setItem(
@@ -363,109 +265,70 @@ function CartPage() {
 
     savePendingCart(items);
 
-    window.dispatchEvent(
-      new Event("cart-updated")
-    );
+    window.dispatchEvent(new Event("cart-updated"));
   };
 
-  const refreshRewardStatus =
-    () => {
-      const cleanedItems =
-        sanitizeCartRewards(
-          getStoredCartRaw()
-        );
-
-      const currentReward =
-        getWheelReward();
-
-      if (
-        currentReward &&
-        !currentReward.used &&
-        currentReward.expiresAt >
-          Date.now()
-      ) {
-        setRemainingTime(
-          currentReward.expiresAt -
-            Date.now()
-        );
-      } else {
-        setRemainingTime(0);
-      }
-
-      setCartItems(
-        (currentItems) => {
-          if (
-            cartsAreEqual(
-              currentItems,
-              cleanedItems
-            )
-          ) {
-            return currentItems;
-          }
-
-          localStorage.setItem(
-            "cart",
-            JSON.stringify(
-              cleanedItems
-            )
-          );
-
-          savePendingCart(
-            cleanedItems
-          );
-
-          window.dispatchEvent(
-            new Event(
-              "cart-updated"
-            )
-          );
-
-          return cleanedItems;
-        }
-      );
-    };
-
-  useEffect(() => {
-    setCartItems(
-      getStoredCart()
+  const refreshRewardStatus = () => {
+    const cleanedItems = sanitizeCartRewards(
+      getStoredCartRaw()
     );
 
-    const savedCustomer =
-      localStorage.getItem(
-        "customer"
+    const currentReward = getWheelReward();
+
+    if (
+      currentReward &&
+      !currentReward.used &&
+      currentReward.expiresAt > Date.now()
+    ) {
+      setRemainingTime(
+        currentReward.expiresAt - Date.now()
       );
+    } else {
+      setRemainingTime(0);
+    }
+
+    setCartItems((currentItems) => {
+      if (cartsAreEqual(currentItems, cleanedItems)) {
+        return currentItems;
+      }
+
+      localStorage.setItem(
+        "cart",
+        JSON.stringify(cleanedItems)
+      );
+
+      savePendingCart(cleanedItems);
+
+      window.dispatchEvent(new Event("cart-updated"));
+
+      return cleanedItems;
+    });
+  };
+
+  useEffect(() => {
+    setCartItems(getStoredCart());
+
+    const savedCustomer = localStorage.getItem("customer");
 
     if (savedCustomer) {
       try {
-        const parsedCustomer =
-          JSON.parse(
-            savedCustomer
-          );
+        const parsedCustomer = JSON.parse(savedCustomer);
 
         setCustomer({
-          name: String(
-            parsedCustomer?.name ??
-              ""
-          ),
-          phone: String(
-            parsedCustomer?.phone ??
-              ""
-          ),
+          name: String(parsedCustomer?.name ?? ""),
+          phone: String(parsedCustomer?.phone ?? ""),
         });
       } catch {
-        localStorage.removeItem(
-          "customer"
-        );
+        localStorage.removeItem("customer");
       }
     }
 
     refreshRewardStatus();
 
-    const interval =
-      window.setInterval(
-        refreshRewardStatus,
-        1000
-      );
+    const interval = window.setInterval(
+      refreshRewardStatus,
+      1000
+    );
 
     window.addEventListener(
       "wheel-reward-updated",
@@ -478,9 +341,7 @@ function CartPage() {
     );
 
     return () => {
-      window.clearInterval(
-        interval
-      );
+      window.clearInterval(interval);
 
       window.removeEventListener(
         "wheel-reward-updated",
@@ -501,53 +362,31 @@ function CartPage() {
     );
   }, [customer]);
 
-  const increaseQuantity = (
-    slug: string
-  ) => {
+  const increaseQuantity = (slug: string) => {
     saveCart(
       cartItems.map((item) =>
         item.slug === slug
-          ? {
-              ...item,
-              quantity:
-                item.quantity +
-                1,
-            }
+          ? { ...item, quantity: item.quantity + 1 }
           : item
       )
     );
   };
 
-  const decreaseQuantity = (
-    slug: string
-  ) => {
+  const decreaseQuantity = (slug: string) => {
     saveCart(
       cartItems
         .map((item) =>
           item.slug === slug
-            ? {
-                ...item,
-                quantity:
-                  item.quantity -
-                  1,
-              }
+            ? { ...item, quantity: item.quantity - 1 }
             : item
         )
-        .filter(
-          (item) =>
-            item.quantity > 0
-        )
+        .filter((item) => item.quantity > 0)
     );
   };
 
-  const deleteItem = (
-    slug: string
-  ) => {
+  const deleteItem = (slug: string) => {
     saveCart(
-      cartItems.filter(
-        (item) =>
-          item.slug !== slug
-      )
+      cartItems.filter((item) => item.slug !== slug)
     );
   };
 
@@ -558,9 +397,7 @@ function CartPage() {
   const total = useMemo(
     () =>
       cartItems.reduce(
-        (sum, item) =>
-          sum +
-          getItemTotal(item),
+        (sum, item) => sum + getItemTotal(item),
         0
       ),
     [cartItems]
@@ -569,200 +406,170 @@ function CartPage() {
   const totalItems = useMemo(
     () =>
       cartItems.reduce(
-        (sum, item) =>
-          sum + item.quantity,
+        (sum, item) => sum + item.quantity,
         0
       ),
     [cartItems]
   );
 
-  const rewardedItem =
-    useMemo(
-      () =>
-        cartItems.find(
-          (item) =>
-item.wheelReward &&
-item.originalPrice !== undefined &&
-item.price < item.originalPrice
-        ),
-      [cartItems]
-    );
-
-  const selectedPayment =
-    paymentMethods.find(
-      (method) =>
-        method.id ===
-        paymentMethod
-    );
-
-
-const checkout = async () => {
-  const customerName = customer.name.trim();
-  const customerPhone = customer.phone.trim();
-
-  if (!customerName) {
-    alert("Le nom complet est obligatoire");
-    return;
-  }
-
-  if (!customerPhone) {
-    alert("Le numéro de téléphone est obligatoire");
-    return;
-  }
-
-  const verifiedCart = sanitizeCartRewards(cartItems);
-
-  if (!cartsAreEqual(verifiedCart, cartItems)) {
-    saveCart(verifiedCart);
-    alert("Votre promotion a expiré. Le panier a été actualisé avec le prix normal.");
-    return;
-  }
-
-  if (verifiedCart.length === 0) {
-    alert("Votre panier est vide");
-    return;
-  }
-
-  const checkoutTotal = verifiedCart.reduce(
-    (sum, item) => sum + getItemTotal(item),
-    0
+  const rewardedItem = useMemo(
+    () =>
+      cartItems.find(
+        (item) =>
+          item.wheelReward &&
+          item.originalPrice !== undefined &&
+          item.price < item.originalPrice
+      ),
+    [cartItems]
   );
 
-  // Normaliser le téléphone du client.
-  const normalizedPhone = customerPhone.replace(/\s+/g, "");
+  const selectedPayment = paymentMethods.find(
+    (method) => method.id === paymentMethod
+  );
 
-  // Préparer les détails de la commande.
-  const order = verifiedCart
-    .map((item, index) => {
-      const itemTotal = getItemTotal(item);
+  // CONFIRMATION DE LA COMMANDE
+  const checkout = async () => {
+    const customerName = customer.name.trim();
+    const customerPhone = customer.phone.trim();
 
-      const rewardText = item.wheelReward
-        ? "\n   🎁 " + item.wheelReward.label +
-          " appliquée sur la première unité"
-        : "";
+    if (!customerName) {
+      alert("Le nom complet est obligatoire");
+      return;
+    }
 
-      return (
-        `${index + 1}. ${item.name} x${item.quantity} = ` +
-        `${formatPrice(itemTotal)} DT${rewardText}`
+    if (!customerPhone) {
+      alert("Le numéro de téléphone est obligatoire");
+      return;
+    }
+
+    const verifiedCart = sanitizeCartRewards(cartItems);
+
+    if (!cartsAreEqual(verifiedCart, cartItems)) {
+      saveCart(verifiedCart);
+
+      alert(
+        "Votre promotion a expiré. Le panier a été actualisé avec le prix normal."
       );
-    })
-    .join("\n");
 
-  // Enregistrer la commande localement.
-  let orders: unknown[] = [];
+      return;
+    }
 
-  try {
-    const storedOrders = JSON.parse(
-      localStorage.getItem("orders") || "[]"
+    if (verifiedCart.length === 0) {
+      alert("Votre panier est vide");
+      return;
+    }
+
+    const checkoutTotal = verifiedCart.reduce(
+      (sum, item) => sum + getItemTotal(item),
+      0
     );
 
-    orders = Array.isArray(storedOrders) ? storedOrders : [];
-  } catch {
-    orders = [];
-  }
+    const normalizedPhone = customerPhone.replace(/\s+/g, "");
 
-  orders.push({
-    id: Date.now(),
-    customer: {
-      name: customerName,
-      phone: customerPhone,
-    },
-    items: verifiedCart,
-    payment: selectedPayment?.name ?? "Non sélectionné",
-    total: checkoutTotal,
-    date: new Date().toLocaleString(),
-  });
+    // Détails des produits.
+    const order = verifiedCart
+      .map((item, index) => {
+        const itemTotal = getItemTotal(item);
 
-  localStorage.setItem("orders", JSON.stringify(orders));
+        const rewardText = item.wheelReward
+          ? "\n🎁 " +
+            item.wheelReward.label +
+            " appliquée sur la première unité"
+          : "";
 
-  // Préparer le message WhatsApp.
-  const messageLines = [
-    "Bonjour, je veux passer une commande ✅",
-    "",
-    "Client : " + customerName,
-    "Téléphone : " + customerPhone,
-    "",
-    "Détails de la commande :",
-    order,
-    "",
-    "Mode de paiement : " +
-      (selectedPayment?.name ?? "Non sélectionné"),
-    "Total : " + formatPrice(checkoutTotal) + " DT",
-  ];
+        return (
+          `${index + 1}. ${item.name} x${item.quantity} = ` +
+          `${formatPrice(itemTotal)} DT${rewardText}`
+        );
+      })
+      .join("\n");
 
-  const text = encodeURIComponent(messageLines.join("\n"));
+    // Enregistrement de la commande localement.
+    let orders: unknown[] = [];
 
-  // TON numéro WhatsApp professionnel.
-  const whatsappUrl =
-    "https://wa.me/21629734222?text=" + text;
+    try {
+      const storedOrders = JSON.parse(
+        localStorage.getItem("orders") || "[]"
+      );
 
-  // Enregistrer le client dans Supabase.
-  try {
-    await saveClient({
-      name: customerName,
-      phone: normalizedPhone,
+      orders = Array.isArray(storedOrders)
+        ? storedOrders
+        : [];
+    } catch {
+      orders = [];
+    }
+
+    orders.push({
+      id: Date.now(),
+      customer: {
+        name: customerName,
+        phone: customerPhone,
+      },
+      items: verifiedCart,
+      payment: selectedPayment?.name ?? "Non sélectionné",
+      total: checkoutTotal,
+      date: new Date().toLocaleString(),
     });
-  } catch (error) {
-    console.error("Erreur enregistrement client :", error);
-  }
 
-  // Consommer la récompense après la création de la commande.
-  const verifiedRewardedItem = verifiedCart.find(
-    (item) =>
-      item.wheelReward &&
-      (item.wheelReward.percentage > 0 ||
-        (item.wheelReward.value ?? 0) > 0) &&
-      item.originalPrice !== undefined &&
-      item.price < item.originalPrice
-  );
+    localStorage.setItem(
+      "orders",
+      JSON.stringify(orders)
+    );
 
-  if (verifiedRewardedItem) {
-    consumeWheelReward(verifiedRewardedItem.name);
-  }
-
-  saveCart([]);
-  setRemainingTime(0);
-
-  // Ouvrir directement la discussion WhatsApp avec le message.
-  window.location.href = whatsappUrl;
-};
-
-
+    // Message WhatsApp complet.
     const messageLines = [
       "Bonjour, je veux passer une commande ✅",
       "",
-      "Client: " +
-        customerName,
-      "Téléphone: " +
-        customerPhone,
+      "Client : " + customerName,
+      "Téléphone : " + customerPhone,
       "",
+      "Détails de la commande :",
       order,
       "",
-      "Mode de paiement: " +
-        (selectedPayment?.name ??
-          "Non sélectionné"),
-      "Total: " +
-        formatPrice(
-          checkoutTotal
-        ) +
-        " DT",
+      "Mode de paiement : " +
+        (selectedPayment?.name ?? "Non sélectionné"),
+      "Total : " + formatPrice(checkoutTotal) + " DT",
     ];
 
-    const text =
-      encodeURIComponent(
-        messageLines.join(
-          "\n"
-        )
+    const text = encodeURIComponent(
+      messageLines.join("\n")
+    );
+
+    const whatsappUrl =
+      `https://wa.me/${WHATSAPP_NUMBER}?text=${text}`;
+
+    // Enregistrement du client dans Supabase.
+    try {
+      await saveClient({
+        name: customerName,
+        phone: normalizedPhone,
+      });
+    } catch (error) {
+      console.error(
+        "Erreur enregistrement client :",
+        error
       );
+    }
 
- const whatsappUrl =
-  "https://wa.me/qr/LIGJJK7BWAQMK1?text=" + text;
+    // Consommation de la récompense.
+    const verifiedRewardedItem = verifiedCart.find(
+      (item) =>
+        item.wheelReward &&
+        (item.wheelReward.percentage > 0 ||
+          (item.wheelReward.value ?? 0) > 0) &&
+        item.originalPrice !== undefined &&
+        item.price < item.originalPrice
+    );
 
-if (whatsappWindow) {
-  whatsappWindow.location.href = whatsappUrl;
-}else {
-  window.open(whatsappUrl, "_blank");
-}
+    if (verifiedRewardedItem) {
+      consumeWheelReward(verifiedRewardedItem.name);
+    }
+
+    saveCart([]);
+    setRemainingTime(0);
+
+    // Redirection directe vers la discussion WhatsApp.
+    window.location.href = whatsappUrl;
   };
 
   return (
@@ -779,7 +586,6 @@ if (whatsappWindow) {
           className="mb-8 inline-flex items-center gap-2 rounded-full border border-border/70 px-4 py-2 text-sm text-muted-foreground transition-smooth hover:border-primary/40 hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
-
           Back to home
         </Link>
 
@@ -793,17 +599,12 @@ if (whatsappWindow) {
             </h1>
 
             <p className="mt-3 text-muted-foreground">
-              You have{" "}
-              {totalItems} item
-              {totalItems !== 1
-                ? "s"
-                : ""}{" "}
-              in your cart.
+              You have {totalItems} item
+              {totalItems !== 1 ? "s" : ""} in your cart.
             </p>
           </div>
 
-          {cartItems.length >
-            0 && (
+          {cartItems.length > 0 && (
             <button
               type="button"
               onClick={clearCart}
@@ -814,37 +615,31 @@ if (whatsappWindow) {
           )}
         </div>
 
-        {rewardedItem &&
-          remainingTime > 0 && (
-            <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/15">
-                  <Clock3 className="h-5 w-5 text-orange-500" />
-                </div>
-
-                <div>
-                  <p className="font-bold text-orange-500">
-                    Offre limitée
-                  </p>
-
-                  <p className="text-sm text-muted-foreground">
-                    Confirme la
-                    commande avant la
-                    fin du compteur.
-                  </p>
-                </div>
+        {rewardedItem && remainingTime > 0 && (
+          <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/15">
+                <Clock3 className="h-5 w-5 text-orange-500" />
               </div>
 
-              <div className="font-mono text-2xl font-black text-orange-500">
-                {formatRemainingTime(
-                  remainingTime
-                )}
+              <div>
+                <p className="font-bold text-orange-500">
+                  Offre limitée
+                </p>
+
+                <p className="text-sm text-muted-foreground">
+                  Confirme la commande avant la fin du compteur.
+                </p>
               </div>
             </div>
-          )}
 
-        {cartItems.length ===
-        0 ? (
+            <div className="font-mono text-2xl font-black text-orange-500">
+              {formatRemainingTime(remainingTime)}
+            </div>
+          </div>
+        )}
+
+        {cartItems.length === 0 ? (
           <div className="gradient-border rounded-3xl p-10 text-center">
             <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15">
               <ShoppingCart className="h-8 w-8 text-primary" />
@@ -855,176 +650,121 @@ if (whatsappWindow) {
             </h2>
 
             <p className="mx-auto mb-6 max-w-md text-muted-foreground">
-              Ajoute un
-              abonnement au panier
-              pour continuer.
+              Ajoute un abonnement au panier pour continuer.
             </p>
 
             <Link to="/">
               <Button className="border-0 gradient-primary text-primary-foreground">
-                Voir les
-                abonnements
+                Voir les abonnements
               </Button>
             </Link>
           </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[1fr_390px]">
             <div className="space-y-4">
-              {cartItems.map(
-                (item) => {
-                  const itemTotal =
-                    getItemTotal(
-                      item
-                    );
+              {cartItems.map((item) => {
+                const itemTotal = getItemTotal(item);
+                const normalPrice =
+                  item.originalPrice ?? item.price;
 
-                  const normalPrice =
-                    item.originalPrice ??
-                    item.price;
+                return (
+                  <div
+                    key={item.slug}
+                    className="gradient-border rounded-3xl p-6 transition-smooth hover:-translate-y-1"
+                  >
+                    <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                      <div className="flex-1">
+                        <p className="mb-1 text-xs uppercase tracking-wider text-primary">
+                          {item.duration}
+                        </p>
 
-                  return (
-                    <div
-                      key={
-                        item.slug
-                      }
-                      className="gradient-border rounded-3xl p-6 transition-smooth hover:-translate-y-1"
-                    >
-                      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                        <div className="flex-1">
-                          <p className="mb-1 text-xs uppercase tracking-wider text-primary">
-                            {
-                              item.duration
-                            }
-                          </p>
+                        <h2 className="text-xl font-bold">
+                          {item.name}
+                        </h2>
 
-                          <h2 className="text-xl font-bold">
-                            {
-                              item.name
-                            }
-                          </h2>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-bold text-foreground">
-                              Prix :{" "}
-                              {formatPrice(
-                                item.price
-                              )}{" "}
-                              DT
-                            </span>
-
-                            {item.wheelReward &&
-                              normalPrice >
-                                item.price && (
-                                <span className="text-sm text-muted-foreground line-through">
-                                  {formatPrice(
-                                    normalPrice
-                                  )}{" "}
-                                  DT
-                                </span>
-                              )}
-                          </div>
-
-                          {item.wheelReward && (
-                            <div className="mt-3 inline-flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
-                              <Gift className="h-4 w-4" />
-
-                              {
-                                item
-                                  .wheelReward
-                                  .label
-                              }{" "}
-                              appliquée
-                            </div>
-                          )}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-bold text-foreground">
+                            Prix : {formatPrice(item.price)} DT
+                          </span>
 
                           {item.wheelReward &&
-                            remainingTime >
-                              0 && (
-                              <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-orange-500">
-                                <Clock3 className="h-3.5 w-3.5" />
-
-                                Expire dans{" "}
-                                {formatRemainingTime(
-                                  remainingTime
-                                )}
-                              </p>
-                            )}
-
-                          {item.wheelReward &&
-                            item.quantity >
-                              1 && (
-                              <p className="mt-2 text-xs text-muted-foreground">
-                                La réduction
-                                est appliquée
-                                uniquement à
-                                la première
-                                unité. Les
-                                autres unités
-                                sont au prix
-                                normal.
-                              </p>
+                            normalPrice > item.price && (
+                              <span className="text-sm text-muted-foreground line-through">
+                                {formatPrice(normalPrice)} DT
+                              </span>
                             )}
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-4">
-                          <div className="flex items-center gap-2 rounded-xl border border-border bg-background/30 p-1">
-                            <button
-                              type="button"
-                              aria-label="Réduire la quantité"
-                              onClick={() =>
-                                decreaseQuantity(
-                                  item.slug
-                                )
-                              }
-                              className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-surface"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
-
-                            <span className="min-w-8 text-center text-sm font-bold">
-                              {
-                                item.quantity
-                              }
-                            </span>
-
-                            <button
-                              type="button"
-                              aria-label="Augmenter la quantité"
-                              onClick={() =>
-                                increaseQuantity(
-                                  item.slug
-                                )
-                              }
-                              className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-surface"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
+                        {item.wheelReward && (
+                          <div className="mt-3 inline-flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs font-bold text-success">
+                            <Gift className="h-4 w-4" />
+                            {item.wheelReward.label} appliquée
                           </div>
+                        )}
 
-                          <span className="gradient-text min-w-[110px] text-right text-2xl font-bold">
-                            {formatPrice(
-                              itemTotal
-                            )}{" "}
-                            DT
+                        {item.wheelReward && remainingTime > 0 && (
+                          <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-orange-500">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            Expire dans{" "}
+                            {formatRemainingTime(remainingTime)}
+                          </p>
+                        )}
+
+                        {item.wheelReward && item.quantity > 1 && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            La réduction est appliquée uniquement à
+                            la première unité. Les autres unités
+                            sont au prix normal.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex items-center gap-2 rounded-xl border border-border bg-background/30 p-1">
+                          <button
+                            type="button"
+                            aria-label="Réduire la quantité"
+                            onClick={() =>
+                              decreaseQuantity(item.slug)
+                            }
+                            className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-surface"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+
+                          <span className="min-w-8 text-center text-sm font-bold">
+                            {item.quantity}
                           </span>
 
                           <button
                             type="button"
-                            aria-label="Supprimer le produit"
+                            aria-label="Augmenter la quantité"
                             onClick={() =>
-                              deleteItem(
-                                item.slug
-                              )
+                              increaseQuantity(item.slug)
                             }
-                            className="rounded-xl border border-border p-2 text-muted-foreground transition hover:border-destructive/40 hover:text-destructive"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-surface"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Plus className="h-4 w-4" />
                           </button>
                         </div>
+
+                        <span className="gradient-text min-w-[110px] text-right text-2xl font-bold">
+                          {formatPrice(itemTotal)} DT
+                        </span>
+
+                        <button
+                          type="button"
+                          aria-label="Supprimer le produit"
+                          onClick={() => deleteItem(item.slug)}
+                          className="rounded-xl border border-border p-2 text-muted-foreground transition hover:border-destructive/40 hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                  );
-                }
-              )}
+                  </div>
+                );
+              })}
             </div>
 
             <aside className="glass h-fit rounded-3xl p-6 shadow-card lg:sticky lg:top-24">
@@ -1034,53 +774,31 @@ if (whatsappWindow) {
 
               <div className="space-y-3 border-b border-border pb-5 text-sm">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>
-                    Total items
-                  </span>
-
-                  <span>
-                    {totalItems}
-                  </span>
+                  <span>Total items</span>
+                  <span>{totalItems}</span>
                 </div>
 
                 <div className="flex justify-between text-muted-foreground">
-                  <span>
-                    Activation
-                  </span>
-
-                  <span className="text-success">
-                    Free
-                  </span>
+                  <span>Activation</span>
+                  <span className="text-success">Free</span>
                 </div>
 
-                {rewardedItem &&
-                  remainingTime >
-                    0 && (
-                    <div className="flex items-center justify-between font-semibold text-orange-500">
-                      <span>
-                        Offre expire
-                        dans
-                      </span>
+                {rewardedItem && remainingTime > 0 && (
+                  <div className="flex items-center justify-between font-semibold text-orange-500">
+                    <span>Offre expire dans</span>
 
-                      <span className="font-mono">
-                        {formatRemainingTime(
-                          remainingTime
-                        )}
-                      </span>
-                    </div>
-                  )}
+                    <span className="font-mono">
+                      {formatRemainingTime(remainingTime)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="my-6 flex items-end justify-between">
-                <span className="font-bold">
-                  Total
-                </span>
+                <span className="font-bold">Total</span>
 
                 <span className="gradient-text text-4xl font-bold">
-                  {formatPrice(
-                    total
-                  )}{" "}
-                  DT
+                  {formatPrice(total)} DT
                 </span>
               </div>
 
@@ -1093,17 +811,11 @@ if (whatsappWindow) {
                   <input
                     required
                     placeholder="Nom complet"
-                    value={
-                      customer.name
-                    }
-                    onChange={(
-                      event
-                    ) =>
+                    value={customer.name}
+                    onChange={(event) =>
                       setCustomer({
                         ...customer,
-                        name: event
-                          .target
-                          .value,
+                        name: event.target.value,
                       })
                     }
                     className="w-full rounded-xl border border-border bg-background/40 px-4 py-3 text-sm outline-none focus:border-primary disabled:opacity-60"
@@ -1113,18 +825,11 @@ if (whatsappWindow) {
                     required
                     type="tel"
                     placeholder="Téléphone"
-                    value={
-                      customer.phone
-                    }
-                    onChange={(
-                      event
-                    ) =>
+                    value={customer.phone}
+                    onChange={(event) =>
                       setCustomer({
                         ...customer,
-                        phone:
-                          event
-                            .target
-                            .value,
+                        phone: event.target.value,
                       })
                     }
                     className="w-full rounded-xl border border-border bg-background/40 px-4 py-3 text-sm outline-none focus:border-primary disabled:opacity-60"
@@ -1138,80 +843,66 @@ if (whatsappWindow) {
                 </h3>
 
                 <div className="grid gap-3">
-                  {paymentMethods.map(
-                    (method) => {
-                      const Icon =
-                        method.icon;
+                  {paymentMethods.map((method) => {
+                    const Icon = method.icon;
+                    const active = paymentMethod === method.id;
 
-                      const active =
-                        paymentMethod ===
-                        method.id;
+                    return (
+                      <button
+                        key={method.id}
+                        type="button"
+                        onClick={() =>
+                          setPaymentMethod(method.id)
+                        }
+                        className={
+                          "flex items-center gap-3 rounded-2xl border p-3 text-left transition-smooth " +
+                          (active
+                            ? "border-primary/50 bg-primary/10"
+                            : "border-border bg-background/30 hover:border-primary/30")
+                        }
+                      >
+                        <div className="flex h-11 w-14 items-center justify-center rounded-xl bg-white text-xs font-black text-black shadow-sm">
+                          {method.badge}
+                        </div>
 
-                      return (
-                        <button
-                          key={
-                            method.id
-                          }
-                          type="button"
-                          onClick={() =>
-                            setPaymentMethod(
-                              method.id
-                            )
-                          }
-                          className={
-                            "flex items-center gap-3 rounded-2xl border p-3 text-left transition-smooth " +
-                            (active
-                              ? "border-primary/50 bg-primary/10"
-                              : "border-border bg-background/30 hover:border-primary/30")
-                          }
-                        >
-                          <div className="flex h-11 w-14 items-center justify-center rounded-xl bg-white text-xs font-black text-black shadow-sm">
-                            {
-                              method.badge
-                            }
+                        <div className="flex flex-1 items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15">
+                            <Icon className="h-4 w-4 text-primary" />
                           </div>
 
-                          <div className="flex flex-1 items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15">
-                              <Icon className="h-4 w-4 text-primary" />
-                            </div>
+                          <div>
+                            <p className="text-sm font-semibold">
+                              {method.name}
+                            </p>
 
-                            <div>
-                              <p className="text-sm font-semibold">
-                                {
-                                  method.name
-                                }
-                              </p>
-
-                              <p className="text-xs text-muted-foreground">
-                                {
-                                  method.desc
-                                }
-                              </p>
-                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {method.desc}
+                            </p>
                           </div>
+                        </div>
 
-                          {active && (
-                            <CheckCircle2 className="h-5 w-5 text-success" />
-                          )}
-                        </button>
-                      );
-                    }
-                  )}
+                        {active && (
+                          <CheckCircle2 className="h-5 w-5 text-success" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               <Button
-  onClick={(e) => {
-    (window as any).fbq?.('track', 'Purchase');
-    checkout();
-  }}
-  disabled={!customer.name.trim() || !customer.phone.trim()}
-  className="h-12 w-full border-0 gradient-primary text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
->
-  Confirmez &amp; Commandez via WhatsApp
-</Button>
-
+                onClick={() => {
+                  (window as any).fbq?.("track", "Purchase");
+                  void checkout();
+                }}
+                disabled={
+                  !customer.name.trim() ||
+                  !customer.phone.trim()
+                }
+                className="h-12 w-full border-0 gradient-primary text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Confirmez &amp; Commandez via WhatsApp
+              </Button>
             </aside>
           </div>
         )}
