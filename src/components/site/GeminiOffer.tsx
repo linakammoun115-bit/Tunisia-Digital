@@ -10,6 +10,62 @@ import {
   ShoppingCart,
 } from "lucide-react";
 
+import { savePendingCart } from "@/lib/products";
+
+const GEMINI_OFFER = {
+  slug: "gemini-ultimate-pack",
+  name: "Gemini Ultimate Pack",
+  price: 55,
+  originalPrice: 55,
+  duration: "1 year",
+  quantity: 1,
+  wheelReward: null,
+};
+
+function addGeminiOfferToCart() {
+  let cart: any[] = [];
+
+  try {
+    const savedCart = localStorage.getItem("cart");
+    const parsed = savedCart ? JSON.parse(savedCart) : [];
+
+    cart = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    cart = [];
+  }
+
+  const existingItem = cart.find(
+    (item) => item.slug === GEMINI_OFFER.slug
+  );
+
+  let updatedCart;
+
+  if (existingItem) {
+    updatedCart = cart.map((item) =>
+      item.slug === GEMINI_OFFER.slug
+        ? {
+            ...item,
+            quantity: Number(item.quantity || 0) + 1,
+          }
+        : item
+    );
+  } else {
+    updatedCart = [...cart, GEMINI_OFFER];
+  }
+
+  localStorage.setItem("cart", JSON.stringify(updatedCart));
+
+  savePendingCart(
+    updatedCart.map((item) => ({
+      slug: item.slug,
+      quantity: item.quantity,
+      duration: item.duration,
+    }))
+  );
+
+  window.dispatchEvent(new Event("cart-updated"));
+}
+
 export function GeminiOffer() {
   return (
     <section className="relative overflow-hidden px-6 py-20">
@@ -82,12 +138,8 @@ export function GeminiOffer() {
               </div>
 
               <Link
-                to="/"
-                onClick={() => {
-                  window.dispatchEvent(
-                    new CustomEvent("add-gemini-offer")
-                  );
-                }}
+                to="/cart"
+                onClick={addGeminiOfferToCart}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-4 font-bold text-primary-foreground shadow-lg transition hover:scale-105 hover:opacity-90"
               >
                 <ShoppingCart className="h-5 w-5" />
