@@ -28,7 +28,6 @@ function addGeminiOfferToCart() {
   try {
     const savedCart = localStorage.getItem("cart");
     const parsed = savedCart ? JSON.parse(savedCart) : [];
-
     cart = Array.isArray(parsed) ? parsed : [];
   } catch {
     cart = [];
@@ -38,20 +37,13 @@ function addGeminiOfferToCart() {
     (item) => item.slug === GEMINI_OFFER.slug
   );
 
-  let updatedCart;
-
-  if (existingItem) {
-    updatedCart = cart.map((item) =>
-      item.slug === GEMINI_OFFER.slug
-        ? {
-            ...item,
-            quantity: Number(item.quantity || 0) + 1,
-          }
-        : item
-    );
-  } else {
-    updatedCart = [...cart, GEMINI_OFFER];
-  }
+  const updatedCart = existingItem
+    ? cart.map((item) =>
+        item.slug === GEMINI_OFFER.slug
+          ? { ...item, quantity: Number(item.quantity || 0) + 1 }
+          : item
+      )
+    : [...cart, GEMINI_OFFER];
 
   localStorage.setItem("cart", JSON.stringify(updatedCart));
 
@@ -66,105 +58,93 @@ function addGeminiOfferToCart() {
   window.dispatchEvent(new Event("cart-updated"));
 }
 
+const features = [
+  { icon: Sparkles, name: "Gemini Pro" },
+  { icon: Cloud, name: "5 TB Storage" },
+  { icon: Video, name: "Veo 3" },
+  { icon: BookOpen, name: "NotebookLM" },
+];
+
 export function GeminiOffer() {
   return (
-    <section className="relative overflow-hidden px-6 py-20">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
+    <section className="px-4 py-10 md:py-14">
+      <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-primary/30 bg-card shadow-xl transition-all duration-300 hover:shadow-2xl">
+        
+        {/* Background effects */}
+        <div className="pointer-events-none absolute -right-20 -top-20 h-52 w-52 rounded-full bg-primary/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-accent/20 blur-3xl" />
 
-      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-primary/30 bg-card shadow-2xl">
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-primary/20 blur-3xl" />
+        <div className="relative grid items-center gap-6 p-6 md:grid-cols-[1.3fr_0.7fr] md:p-9">
 
-        <div className="relative grid items-center gap-10 p-8 md:grid-cols-2 md:p-14">
+          {/* Offer information */}
           <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary">
-              <Sparkles className="h-4 w-4" />
-              Offre spéciale · 1 an
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              OFFRE EXCLUSIVE · 1 AN
             </div>
 
-            <h2 className="mb-5 text-4xl font-black leading-tight md:text-6xl">
+            <h2 className="text-3xl font-black leading-tight md:text-4xl">
               GEMINI
               <span className="block bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 ULTIMATE PACK
               </span>
             </h2>
 
-            <p className="mb-7 max-w-lg text-muted-foreground">
-              Tous tes outils Google AI préférés réunis dans
-              un seul pack pour booster ta créativité et ta
-              productivité.
+            <p className="mt-3 max-w-md text-sm text-muted-foreground">
+              Toute la puissance de Google AI dans un seul abonnement.
+              Crée, travaille et stocke sans limites.
             </p>
 
-            <div className="mb-8 grid gap-4 sm:grid-cols-2">
-              {[
-                { icon: Sparkles, name: "Gemini Pro" },
-                { icon: Cloud, name: "5 TB de stockage" },
-                { icon: Video, name: "Veo 3" },
-                { icon: BookOpen, name: "NotebookLM" },
-              ].map((feature) => {
+            {/* Features */}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {features.map((feature) => {
                 const Icon = feature.icon;
 
                 return (
                   <div
                     key={feature.name}
-                    className="flex items-center gap-3"
+                    className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/60 p-2.5"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                      <Icon className="h-5 w-5" />
-                    </div>
-
-                    <span className="text-sm font-semibold">
+                    <Icon className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-xs font-semibold">
                       {feature.name}
                     </span>
-
-                    <Check className="ml-auto h-4 w-4 text-success" />
+                    <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-green-500" />
                   </div>
                 );
               })}
             </div>
-
-            <div className="flex flex-wrap items-center gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Prix spécial
-                </p>
-
-                <p className="text-5xl font-black text-primary">
-                  55 DT
-                </p>
-
-                <p className="text-xs text-muted-foreground">
-                  Pour 12 mois
-                </p>
-              </div>
-
-              <Link
-                to="/cart"
-                onClick={addGeminiOfferToCart}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-4 font-bold text-primary-foreground shadow-lg transition hover:scale-105 hover:opacity-90"
-              >
-                <ShoppingCart className="h-5 w-5" />
-                Profiter de l'offre
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
           </div>
 
-          <div className="relative flex min-h-[300px] items-center justify-center">
-            <div className="absolute h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+          {/* Price and CTA */}
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-primary/20 bg-primary/5 p-5 text-center">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Prix spécial
+            </span>
 
-            <div className="relative flex h-64 w-64 items-center justify-center rounded-[3rem] border border-primary/30 bg-gradient-to-br from-primary/20 to-accent/20 shadow-2xl md:h-80 md:w-80">
-              <div className="text-center">
-                <Sparkles className="mx-auto mb-5 h-24 w-24 text-primary" />
-
-                <p className="text-3xl font-black">
-                  GEMINI
-                </p>
-
-                <p className="mt-2 text-sm font-semibold tracking-[0.3em] text-primary">
-                  ULTIMATE
-                </p>
-              </div>
+            <div className="my-2 flex items-baseline gap-1">
+              <span className="text-5xl font-black text-primary">55</span>
+              <span className="text-xl font-bold text-primary">DT</span>
             </div>
+
+            <span className="mb-5 text-xs text-muted-foreground">
+              Pour 12 mois complets
+            </span>
+
+            <Link
+              to="/cart"
+              onClick={addGeminiOfferToCart}
+              className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-lg transition-all duration-300 hover:-translate-y-1 hover:opacity-90"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              Profiter de l'offre
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+
+            <p className="mt-3 text-[10px] text-muted-foreground">
+              <Check className="mr-1 inline h-3 w-3 text-green-500" />
+              Offre disponible sur TunisiaSubs
+            </p>
           </div>
         </div>
       </div>
