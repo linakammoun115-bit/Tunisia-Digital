@@ -67,14 +67,14 @@ const features = [
 
 export function GeminiOffer() {
   return (
-    <section className="px-4 py-10 md:py-14">
-      <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-primary/30 bg-card shadow-xl transition-all duration-300 hover:shadow-2xl">
+    <section className="px-4 py-6">
+      <div className="relative mx-auto max-w-2xl overflow-hidden rounded-2xl border border-primary/30 bg-card shadow-xl transition-all duration-300 hover:shadow-2xl">
         
         {/* Background effects */}
         <div className="pointer-events-none absolute -right-20 -top-20 h-52 w-52 rounded-full bg-primary/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-accent/20 blur-3xl" />
 
-        <div className="relative grid items-center gap-6 p-6 md:grid-cols-[1.3fr_0.7fr] md:p-9">
+        <div className="relative grid items-center gap-4 p-4 md:grid-cols-[1.3fr_0.7fr] md:p-5">
 
           {/* Offer information */}
           <div>
