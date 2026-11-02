@@ -11,6 +11,7 @@ import { Testimonials } from "../components/site/Testimonials";
 import { Faq } from "../components/site/Faq";
 import { Contact } from "../components/site/Contact";
 import { Footer } from "../components/site/Footer";
+import { GeminiOffer } from "../components/site/GeminiOffer";
 
 export const Route = createFileRoute("/")({
   component: Index,
