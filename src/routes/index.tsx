@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Navbar } from "../components/site/Navbar";
 import { Hero } from "../components/site/Hero";
 import { MarqueeStrip } from "../components/site/MarqueeStrip";
+
 import { Subscriptions } from "../components/site/Subscriptions";
 import { Categories } from "../components/site/Categories";
 import { WhyUs } from "../components/site/WhyUs";
@@ -45,6 +46,7 @@ function Index() {
       <main>
         <Hero />
         <MarqueeStrip />
+        <GeminiOffer />
         <Subscriptions />
         <Categories />
         <WhyUs />
